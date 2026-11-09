@@ -11,6 +11,7 @@ import { customerDir } from '../lib/paths.mjs';
 import { loadCustomer, validateConfig } from '../lib/config.mjs';
 import { ensurePocketBase } from '../lib/pocketbase.mjs';
 import { instanceArgs, prepareInstance } from '../lib/instanz.mjs';
+import { buildPublic } from '../lib/public.mjs';
 
 export const require = createRequire(import.meta.url);
 export const slots = require('../../pb_hooks/nf/slots.js');
@@ -59,28 +60,33 @@ async function freierPort() {
 }
 
 /** Example config with deterministic dates far in the future (2030). */
-export function testKonfiguration(mutate) {
-  const dir = customerDir('_beispiel');
+export function testKonfiguration(mutate, dir = customerDir('_beispiel')) {
   const { config } = loadCustomer(dir);
   const c = structuredClone(config);
   c.termine.zeitraum = { buchbar_ab: '2030-01-07', buchbar_bis: '2030-03-31' };
   c.termine.folgetermin = { termintyp: 'abholung', ab: '2030-04-01', bis: '2030-05-31' };
   c.termine.sperrtage = [{ datum: '2030-01-09', grund: 'Test-Sperrtag' }];
   if (mutate) mutate(c);
-  const errors = validateConfig(c, { dir, folderName: '_beispiel' });
+  const errors = validateConfig(c, { dir });
   if (errors.length) throw new Error(`Testkonfiguration ungültig:\n${errors.join('\n')}`);
   return c;
 }
 
 /**
  * Starts a real instance (migrations, start values, admin) with a webhook receiver.
+ * With seiten: true the public pages are served too (branding from kundeDir).
  * Returns helpers for requests; call stop() at the end.
  */
-export async function startInstanz({ mutate } = {}) {
+export async function startInstanz({ mutate, kundeDir = customerDir('_beispiel'), seiten = false } = {}) {
   const exe = await ensurePocketBase({ log: () => {} });
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nf-api-'));
   const dataDir = path.join(root, 'pb_data');
-  const config = testKonfiguration(mutate);
+  const config = testKonfiguration(mutate, kundeDir);
+  const extraArgs = [];
+  if (seiten) {
+    const publicDir = buildPublic({ customerDirPath: kundeDir, branding: config.branding, outDir: path.join(root, 'public') });
+    extraArgs.push(`--publicDir=${publicDir}`);
+  }
 
   const webhooks = [];
   const empfaenger = http.createServer((req, res) => {
@@ -102,7 +108,7 @@ export async function startInstanz({ mutate } = {}) {
   const admin = { email: 'admin@test.example', password: 'test-passwort-123' };
   prepareInstance({ exe, dataDir, config, superuser: admin, quiet: true, env });
 
-  const child = spawn(exe, ['serve', `--http=127.0.0.1:${port}`, ...instanceArgs(dataDir)], { env, stdio: 'pipe' });
+  const child = spawn(exe, ['serve', `--http=127.0.0.1:${port}`, ...extraArgs, ...instanceArgs(dataDir)], { env, stdio: 'pipe' });
   let log = '';
   child.stdout.on('data', (d) => { log += d; });
   child.stderr.on('data', (d) => { log += d; });
