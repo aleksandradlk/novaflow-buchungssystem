@@ -1,0 +1,8 @@
+{
+  "$schema": "../../kern/schema/status.schema.json",
+  "status": [
+    { "code": "eingegangen", "name": "Eingegangen", "mail": false, "start": true },
+    { "code": "in_arbeit", "name": "In Arbeit", "mail": true },
+    { "code": "fertig", "name": "Fertig", "mail": true, "abschluss": true }
+  ]
+}

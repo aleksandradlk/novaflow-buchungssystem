@@ -1,0 +1,40 @@
+{
+  "$schema": "../../kern/schema/angebote.schema.json",
+  "angebote": [
+    {
+      "code": "basis",
+      "name": "Paket Basis",
+      "beschreibung": "Durchsicht und Pflege – das Wichtigste in einem Termin.",
+      "preis_text": "ab 49 €",
+      "termintyp": "abgabe",
+      "folgetermin": false,
+      "aktiv": true,
+      "sortierung": 1,
+      "zusatzoptionen": [
+        {
+          "code": "reinigung",
+          "name": "Gründliche Reinigung",
+          "preis_text": "+ 15 €"
+        }
+      ]
+    },
+    {
+      "code": "komplett",
+      "name": "Paket Komplett",
+      "beschreibung": "Rundum-Service mit Aufbewahrung bis zur Abholung.",
+      "preis_text": "ab 129 €",
+      "termintyp": "abgabe",
+      "ressource": "stellplatz",
+      "folgetermin": true,
+      "aktiv": true,
+      "sortierung": 2,
+      "zusatzoptionen": [
+        {
+          "code": "reinigung",
+          "name": "Gründliche Reinigung",
+          "preis_text": "+ 15 €"
+        }
+      ]
+    }
+  ]
+}

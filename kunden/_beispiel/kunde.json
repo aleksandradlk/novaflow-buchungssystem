@@ -1,0 +1,62 @@
+{
+  "$schema": "../../kern/schema/kunde.schema.json",
+  "kennung": "_beispiel",
+  "name": "Musterbetrieb",
+  "firma": {
+    "name": "Musterbetrieb GmbH",
+    "strasse": "Musterstraße 1",
+    "plz": "12345",
+    "ort": "Musterstadt",
+    "telefon": "+49 123 456789",
+    "email": "info@musterbetrieb.example"
+  },
+  "domain": "buchung.musterbetrieb.example",
+  "zeitzone": "Europe/Berlin",
+  "ansprache": "sie",
+  "module": {
+    "buchung": true,
+    "kapazitaet": true,
+    "nachrichten": true,
+    "kampagne": true,
+    "status": true,
+    "folgetermin": true,
+    "uebersicht": true,
+    "touren": true,
+    "import": true,
+    "export": true,
+    "loeschung": true
+  },
+  "rollen": {
+    "max_mitarbeiter": 3
+  },
+  "loeschfristen": {
+    "fotos_monate_nach_abschluss": 6,
+    "buchungen_monate_nach_abschluss": 24
+  },
+  "formular": {
+    "adresse": "optional",
+    "telefon": "pflicht",
+    "fotos": {
+      "erlaubt": true,
+      "max_anzahl": 5,
+      "max_mb": 10
+    },
+    "zusatzfelder": [
+      {
+        "key": "geraet",
+        "label": "Gerät / Modell",
+        "typ": "text",
+        "pflicht": false,
+        "ziel": "kontakt"
+      },
+      {
+        "key": "zustand",
+        "label": "Zustand",
+        "typ": "auswahl",
+        "pflicht": true,
+        "ziel": "buchung",
+        "optionen": ["Gut", "Gebraucht", "Reparaturbedürftig"]
+      }
+    ]
+  }
+}

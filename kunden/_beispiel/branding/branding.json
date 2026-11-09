@@ -1,0 +1,17 @@
+{
+  "$schema": "../../../kern/schema/branding.schema.json",
+  "logo": "logo.svg",
+  "farben": {
+    "primaer": "#1f5f5b",
+    "auf_primaer": "#ffffff",
+    "akzent": "#b5651d",
+    "hintergrund": "#f6f5f1",
+    "flaeche": "#ffffff",
+    "text": "#1c1c1a",
+    "rahmen": "#d6d3c8"
+  },
+  "schrift": {
+    "familie": "system",
+    "dateien": []
+  }
+}
