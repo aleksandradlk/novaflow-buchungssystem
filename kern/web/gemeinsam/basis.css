@@ -1,0 +1,51 @@
+/* Grundlayout für alle Seiten. Farben und Schrift kommen aus /kunde/branding.css. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-bg, #ffffff);
+  color: var(--color-text, #1a1a1a);
+  font-family: var(--font-family, system-ui, sans-serif);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.placeholder {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 3rem 1rem;
+}
+
+.placeholder .logo {
+  width: 100%;
+  max-width: 15rem;
+  aspect-ratio: 5 / 1;
+  background: var(--logo-url) left center / contain no-repeat;
+  margin-bottom: 2rem;
+}
+
+.placeholder .card {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+}
+
+.placeholder h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+  color: var(--color-primary, inherit);
+}
+
+.placeholder p {
+  margin: 0;
+}
