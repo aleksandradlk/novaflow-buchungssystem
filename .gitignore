@@ -1,0 +1,39 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Daten und Uploads (nie ins Repo – DSGVO)
+pb_data/
+**/pb_data/
+uploads/
+storage/
+backups/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Kundendaten und Verträge
+*.csv
+*.xlsx
+*.xls
+*.pdf
+*.docx
+!docs/**/*.pdf
+
+# Binaries / Downloads
+pocketbase
+pocketbase.exe
+*.zip
+
+# Node / Build
+node_modules/
+dist/
+.cache/
+
+# System
+.DS_Store
+Thumbs.db
+*.log
+
