@@ -1,4 +1,6 @@
-/* Grundlayout für alle Seiten. Farben und Schrift kommen aus /kunde/branding.css. */
+/* Layout for all public pages – mobile first.
+   Colors and font come from /kunde/branding.css (CSS variables). No external resources. */
+
 *,
 *::before,
 *::after {
@@ -12,12 +14,557 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: var(--color-bg, #ffffff);
   color: var(--color-text, #1a1a1a);
   font-family: var(--font-family, system-ui, sans-serif);
   font-size: 1rem;
   line-height: 1.5;
 }
+
+a {
+  color: var(--color-primary, #1a1a1a);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  line-height: 1.25;
+  margin: 0 0 0.75rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  color: var(--color-primary, inherit);
+}
+
+h2 {
+  font-size: 1.25rem;
+}
+
+h3 {
+  font-size: 1.1rem;
+}
+
+h4 {
+  font-size: 1rem;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-accent, #000000);
+  outline-offset: 2px;
+}
+
+[tabindex="-1"]:focus {
+  outline: none;
+}
+
+.unsichtbar {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.klein {
+  font-size: 0.9rem;
+}
+
+.block {
+  display: block;
+}
+
+/* ---------------------------------------------------------------- frame */
+
+.kopf {
+  padding: 1rem;
+  max-width: 40rem;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.kopf .logo {
+  display: block;
+  height: 2.5rem;
+  width: auto;
+  max-width: 100%;
+}
+
+.kopf .name {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.seite {
+  flex: 1;
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 0 1rem 2rem;
+}
+
+.fuss {
+  border-top: 1px solid var(--color-border, #dddddd);
+  padding: 1rem;
+  font-size: 0.9rem;
+}
+
+.fuss nav {
+  max-width: 40rem;
+  margin: 0 auto;
+  display: flex;
+  gap: 1.5rem;
+}
+
+.laden {
+  color: var(--color-text, #1a1a1a);
+}
+
+/* ---------------------------------------------------------------- messages */
+
+.meldung:empty {
+  display: none;
+}
+
+.meldung,
+.hinweis-box,
+.erfolg {
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.meldung-fehler {
+  background: #fdecea;
+  color: #8a1c13;
+  border: 1px solid #e6a49c;
+}
+
+.meldung-info,
+.hinweis-box {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #dddddd);
+}
+
+.erfolg {
+  background: #e8f5ec;
+  color: #14532d;
+  border: 1px solid #9fd3b0;
+}
+
+.durchgestrichen {
+  text-decoration: line-through;
+}
+
+/* ---------------------------------------------------------------- steps */
+
+.schritte {
+  list-style: none;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0;
+  margin: 0 0 1.25rem;
+  counter-reset: none;
+}
+
+.schritte li {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.schritte .nr {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--color-border, #dddddd);
+  background: var(--color-surface, #ffffff);
+  font-weight: 600;
+}
+
+.schritte .erledigt .nr {
+  border-color: var(--color-primary, #333333);
+}
+
+.schritte .aktiv .nr {
+  background: var(--color-primary, #333333);
+  border-color: var(--color-primary, #333333);
+  color: var(--color-on-primary, #ffffff);
+}
+
+.schritte .aktiv .kurz {
+  font-weight: 600;
+}
+
+.einleitung {
+  margin: 0 0 1.5rem;
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.aktionen {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin: 1.5rem 0 0;
+}
+
+.aktionen.links {
+  justify-content: flex-start;
+}
+
+.knopf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.5rem;
+  border: 2px solid var(--color-primary, #333333);
+  background: var(--color-surface, #ffffff);
+  color: var(--color-primary, #333333);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.knopf.haupt {
+  background: var(--color-primary, #333333);
+  color: var(--color-on-primary, #ffffff);
+  flex: 1;
+}
+
+.knopf.warnung {
+  border-color: #b42318;
+  color: #b42318;
+}
+
+.knopf.haupt.warnung,
+.rueckfrage .knopf.warnung {
+  background: #b42318;
+  color: #ffffff;
+}
+
+.knopf:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------- offers */
+
+.gruppe {
+  border: 0;
+  padding: 0;
+  margin: 0 0 1.25rem;
+}
+
+.gruppe legend {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  padding: 0;
+}
+
+.karten {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.karte {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 1rem;
+  border: 2px solid var(--color-border, #dddddd);
+  border-radius: 0.75rem;
+  background: var(--color-surface, #ffffff);
+  cursor: pointer;
+}
+
+.karte:has(input:checked) {
+  border-color: var(--color-primary, #333333);
+}
+
+.karte input,
+.wahl input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0.15rem 0 0;
+  flex: none;
+  accent-color: var(--color-primary, #333333);
+}
+
+.karte-inhalt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.karte-titel {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.preis {
+  font-weight: 600;
+}
+
+.wahl {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.5rem 0;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------- selection summary */
+
+.auswahl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  padding: 0.75rem 1rem;
+  margin: 0 0 1.25rem;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: 0.5rem;
+}
+
+.auswahl dt {
+  font-weight: 600;
+}
+
+.auswahl dd {
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------- calendar */
+
+.kalender {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+}
+
+.kal-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.kal-titel {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.kal-nav {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  border: 1px solid var(--color-border, #dddddd);
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text, #1a1a1a);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.kal-nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.kal-wochentage,
+.kal-raster {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+  text-align: center;
+}
+
+.kal-wochentage {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.kal-tag {
+  aspect-ratio: 1;
+  min-height: 2.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text, #1a1a1a);
+  font: inherit;
+  cursor: pointer;
+}
+
+.kal-tag.kal-frei {
+  border-color: var(--color-primary, #333333);
+  font-weight: 600;
+}
+
+.kal-tag.gewaehlt,
+.kal-zeit.gewaehlt {
+  background: var(--color-primary, #333333);
+  color: var(--color-on-primary, #ffffff);
+}
+
+.kal-tag:disabled {
+  cursor: default;
+  color: #8a8a8a;
+}
+
+.kal-tag.kal-voll,
+.kal-tag.kal-geschlossen {
+  text-decoration: line-through;
+  background: var(--color-bg, #f2f2f2);
+}
+
+.kal-status:empty {
+  display: none;
+}
+
+.kal-status {
+  margin: 0.75rem 0 0;
+}
+
+.kal-zeiten:empty {
+  display: none;
+}
+
+.kal-tagtitel {
+  margin: 1rem 0 0.5rem;
+}
+
+.kal-zeitliste {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
+  gap: 0.5rem;
+}
+
+.kal-zeit {
+  min-height: 2.75rem;
+  border-radius: 0.5rem;
+  border: 2px solid var(--color-primary, #333333);
+  background: var(--color-surface, #ffffff);
+  color: var(--color-primary, #333333);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kal-zeit:disabled {
+  border-color: var(--color-border, #dddddd);
+  color: #8a8a8a;
+  text-decoration: line-through;
+  background: var(--color-bg, #f2f2f2);
+  cursor: default;
+}
+
+/* ---------------------------------------------------------------- forms */
+
+.feld {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0 0 1rem;
+}
+
+.feld > label {
+  font-weight: 600;
+}
+
+.feld .wahl {
+  font-weight: normal;
+}
+
+.pflicht {
+  color: #b42318;
+}
+
+.feld input[type="text"],
+.feld input[type="email"],
+.feld input[type="tel"],
+.feld select,
+.feld textarea {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #767676;
+  border-radius: 0.5rem;
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text, #1a1a1a);
+  font: inherit;
+}
+
+.feld input[type="file"] {
+  font: inherit;
+}
+
+.feld [aria-invalid="true"] {
+  border: 2px solid #b42318;
+}
+
+.feld .hinweis {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.feld-fehler {
+  margin: 0;
+  color: #b42318;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.zeile {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 0.75rem;
+}
+
+.datenschutz {
+  margin-top: 1rem;
+}
+
+/* ---------------------------------------------------------------- manage page */
+
+.bereich-aktion:empty {
+  display: none;
+}
+
+.bereich-aktion,
+.folgetermin {
+  margin-top: 1.5rem;
+}
+
+.rueckfrage {
+  padding: 1rem;
+  border: 2px solid #b42318;
+  border-radius: 0.75rem;
+  background: var(--color-surface, #ffffff);
+}
+
+.rueckfrage p {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- placeholder (overview until phase 5) */
 
 .placeholder {
   max-width: 32rem;
@@ -42,10 +589,20 @@ body {
 
 .placeholder h1 {
   margin: 0 0 0.5rem;
-  font-size: 1.5rem;
-  color: var(--color-primary, inherit);
 }
 
 .placeholder p {
   margin: 0;
+}
+
+@media (min-width: 40rem) {
+  .knopf.haupt {
+    flex: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+  }
 }
