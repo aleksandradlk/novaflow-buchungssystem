@@ -6,7 +6,8 @@ const kap = require(`${__hooks}/nf/kapazitaet.js`);
 
 const fehler = basis.fehler;
 const MAX_TAGE_SLOTS = 62;
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// Same strictness as the database e-mail field, so invalid input never reaches save().
+const EMAIL = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 const TELEFON = /^\+?[0-9 ()\/-]{6,30}$/;
 const PLZ = /^[0-9]{5}$/;
 const BILD = /\.(jpe?g|png|webp|heic|heif)$/i;
@@ -152,9 +153,13 @@ function transaktion(fn) {
   } catch (err) {
     const api = basis.apiFehler(err);
     if (api) throw api;
+    // Validation errors of save() (should be caught earlier) become field errors, not a 500.
     const s = String(err);
     if (s.indexOf("fotos") !== -1) {
       throw basis.fehlerFelder({ fotos: "Bitte nur Bilder (JPG, PNG, WebP, HEIC) im erlaubten Umfang hochladen." });
+    }
+    if (s.indexOf("email") !== -1) {
+      throw basis.fehlerFelder({ "kontakt.email": "Bitte eine gültige E-Mail-Adresse angeben." });
     }
     throw err;
   }
@@ -351,9 +356,7 @@ function angebot(e) {
   }
 
   return e.json(200, {
-    betrieb: { name: cfg.betrieb.name, logo: cfg.betrieb.logo ? "/kunde/" + cfg.betrieb.logo : "" },
-    ansprache: ansprache,
-    texte: cfg.hinweistexte[ansprache] || {},
+    seite: basis.seite(cfg),
     angebote: angebote,
     termintypen: typen.map(function (t) { return { code: t.code, name: t.name, dauer_minuten: t.dauer_minuten }; }),
     zeitraum: { ab: cfg.buchbar_ab, bis: cfg.buchbar_bis },
@@ -361,7 +364,6 @@ function angebot(e) {
     einwilligungen: (cfg.rechtliches.einwilligungen || []).map(function (x) {
       return { kanal: x.kanal, text: x.text[ansprache] };
     }),
-    rechtliches: { impressum_url: cfg.rechtliches.impressum_url, datenschutz_url: cfg.rechtliches.datenschutz_url },
     kontakt: kontakt,
   });
 }
@@ -469,6 +471,7 @@ function verwaltenLesen(e) {
   if (!b) throw fehler(404, basis.MELDUNG.linkUngueltig);
   const offen = aenderbar(b);
   return e.json(200, {
+    seite: basis.seite(cfg),
     buchung: buchungDto($app, cfg, b),
     aktionen: { verschieben: offen, absagen: offen },
     folgetermin: folgeterminInfo($app, cfg, b),
@@ -534,7 +537,7 @@ function folgeterminLesen(e) {
   const cfg = basis.einstellungen($app);
   const b = findeBuchung($app, basis.token(e));
   if (!b) throw fehler(404, basis.MELDUNG.linkUngueltig);
-  return e.json(200, { buchung: buchungDto($app, cfg, b), folgetermin: folgeterminInfo($app, cfg, b) });
+  return e.json(200, { seite: basis.seite(cfg), buchung: buchungDto($app, cfg, b), folgetermin: folgeterminInfo($app, cfg, b) });
 }
 
 function folgeterminBuchen(e) {
@@ -580,18 +583,31 @@ function folgeterminBuchen(e) {
   });
 }
 
-// ---------------------------------------------------------------- GET /api/nf/abmelden?t=
+// ---------------------------------------------------------------- GET/POST /api/nf/abmelden?t=
+// GET only shows the state (mail programs may open links automatically);
+// the unsubscribe itself needs the POST from the page's button.
 
-function abmelden(e) {
+function kontaktPerToken(e) {
   const t = basis.token(e);
   const k = t ? findeKontakt($app, "token = {:t}", { t: t }) : null;
   if (!k) throw fehler(404, basis.MELDUNG.linkUngueltig);
+  return k;
+}
+
+function abmeldenLesen(e) {
+  const cfg = basis.einstellungen($app);
+  const k = kontaktPerToken(e);
+  return e.json(200, { seite: basis.seite(cfg), abgemeldet: k.getBool("abgemeldet") });
+}
+
+function abmelden(e) {
+  const k = kontaktPerToken(e);
   if (!k.getBool("abgemeldet")) {
     k.set("abgemeldet", true);
     k.set("abgemeldet_am", basis.pbDatum(Date.now()));
     $app.save(k);
   }
-  return e.json(200, { ok: true });
+  return e.json(200, { ok: true, abgemeldet: true });
 }
 
 module.exports = {
@@ -602,5 +618,6 @@ module.exports = {
   verwaltenAendern: verwaltenAendern,
   folgeterminLesen: folgeterminLesen,
   folgeterminBuchen: folgeterminBuchen,
+  abmeldenLesen: abmeldenLesen,
   abmelden: abmelden,
 };

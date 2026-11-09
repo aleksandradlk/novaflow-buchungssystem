@@ -57,8 +57,10 @@ describe('GET /api/nf/angebot', () => {
     const r = await I.api('GET', '/api/nf/angebot');
     assert.equal(r.status, 200);
     assert.deepEqual(r.json.angebote.map((a) => a.code), ['basis', 'komplett']);
-    assert.equal(r.json.ansprache, 'sie');
-    assert.match(r.json.texte.einleitung, /Wählen Sie/);
+    assert.equal(r.json.seite.ansprache, 'sie');
+    assert.equal(r.json.seite.zeitzone, 'Europe/Berlin');
+    assert.equal(r.json.seite.betrieb.logo, '/kunde/logo.svg');
+    assert.match(r.json.seite.texte.einleitung, /Wählen Sie/);
     assert.equal(r.json.einwilligungen.length, 1);
     assert.equal(r.json.kontakt, null);
     assert.doesNotMatch(r.text, /token/i);
@@ -106,6 +108,14 @@ describe('POST /api/nf/buchen', () => {
     assert.equal(r.status, 400);
     for (const f of ['kontakt.vorname', 'kontakt.nachname', 'kontakt.email', 'kontakt.telefon', 'zusatzfelder.zustand']) {
       assert.ok(r.json.data[f], `Feld ${f} fehlt in ${r.text}`);
+    }
+  });
+
+  test('ungültige E-Mail (z. B. mit Doppelpunkt) → 400 am Feld, nicht 500', async () => {
+    for (const email of ['a:b@example.com', 'ohne-at.example.com', 'x@localhost']) {
+      const r = await buchen(slot('2030-01-07', '08:00'), { kontakt: { ...KONTAKT, email } });
+      assert.equal(r.status, 400, `${email}: ${r.text}`);
+      assert.ok(r.json.data['kontakt.email'], email);
     }
   });
 
@@ -299,7 +309,7 @@ describe('Folgetermin', () => {
 });
 
 describe('Kontakt-Token: Vorbelegung und Abmeldung', () => {
-  test('Angebot mit Token liefert Kontaktdaten; Abmelden setzt abgemeldet mit Datum', async () => {
+  test('Angebot mit Token liefert Kontaktdaten; Abmelden erst per POST, mit Datum', async () => {
     await buchen(slot('2030-02-13', '08:00'), { kontakt: { ...KONTAKT, email: 'token@example.com' }, zusatzfelder: { ...ZUSATZ, geraet: 'Modell X' } });
     const [k] = await adminHole('kontakte', 'email = "token@example.com"');
 
@@ -307,8 +317,14 @@ describe('Kontakt-Token: Vorbelegung und Abmeldung', () => {
     assert.equal(a.json.kontakt.vorname, 'Erika');
     assert.equal(a.json.kontakt.zusatzfelder.geraet, 'Modell X');
 
-    const r = await I.api('GET', `/api/nf/abmelden?t=${k.token}`);
+    const status = await I.api('GET', `/api/nf/abmelden?t=${k.token}`);
+    assert.equal(status.json.abgemeldet, false);
+    const [unveraendert] = await adminHole('kontakte', 'email = "token@example.com"');
+    assert.equal(unveraendert.abgemeldet, false, 'GET darf nicht abmelden');
+
+    const r = await I.api('POST', `/api/nf/abmelden?t=${k.token}`);
     assert.equal(r.status, 200);
+    assert.equal((await I.api('GET', `/api/nf/abmelden?t=${k.token}`)).json.abgemeldet, true);
     const [danach] = await adminHole('kontakte', 'email = "token@example.com"');
     assert.equal(danach.abgemeldet, true);
     assert.notEqual(danach.abgemeldet_am, '');

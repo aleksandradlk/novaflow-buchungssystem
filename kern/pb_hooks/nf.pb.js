@@ -59,6 +59,11 @@ routerAdd("POST", "/api/nf/folgetermin", (e) => {
 
 routerAdd("GET", "/api/nf/abmelden", (e) => {
   const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/routen.js`).abmeldenLesen(e));
+});
+
+routerAdd("POST", "/api/nf/abmelden", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
   return basis.sicher(e, () => require(`${__hooks}/nf/routen.js`).abmelden(e));
 });
 

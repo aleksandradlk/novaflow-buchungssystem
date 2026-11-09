@@ -132,6 +132,18 @@ function alsMs(s) {
   return s ? Date.parse(String(s).replace(" ", "T")) : NaN;
 }
 
+/** Page frame info for every public page: name, logo, time zone, texts, legal links. */
+function seite(cfg) {
+  const ansprache = cfg.ansprache === "du" ? "du" : "sie";
+  return {
+    betrieb: { name: cfg.betrieb.name, logo: cfg.betrieb.logo ? "/kunde/" + cfg.betrieb.logo : "" },
+    zeitzone: cfg.betrieb.zeitzone || "Europe/Berlin",
+    ansprache: ansprache,
+    texte: cfg.hinweistexte[ansprache] || {},
+    rechtliches: { impressum_url: cfg.rechtliches.impressum_url, datenschutz_url: cfg.rechtliches.datenschutz_url },
+  };
+}
+
 function heuteLokal(cfg) {
   return zeit(cfg).toLocal(Date.now()).datum;
 }
@@ -203,6 +215,7 @@ module.exports = {
   zeit: zeit,
   pbDatum: pbDatum,
   alsMs: alsMs,
+  seite: seite,
   heuteLokal: heuteLokal,
   token: token,
   neuesToken: neuesToken,
