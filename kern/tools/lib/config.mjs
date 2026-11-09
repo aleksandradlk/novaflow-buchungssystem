@@ -30,6 +30,9 @@ const MODULE_DEPENDENCIES = {
   touren: ['uebersicht'],
 };
 
+// Upload limit per booking request (see bodyLimit in kern/pb_hooks/nf.pb.js).
+const MAX_UPLOAD_MB = 100;
+
 // Fields every booking form has anyway – extra fields must not reuse these keys.
 const STANDARD_FIELDS = ['anrede', 'vorname', 'nachname', 'email', 'telefon', 'strasse', 'plz', 'ort', 'bemerkung', 'notiz', 'fotos'];
 
@@ -168,6 +171,9 @@ function crossErrors(c, { dir, folderName }) {
   }
   if (K.formular.fotos.erlaubt && K.formular.fotos.max_anzahl < 1) {
     err('kunde.json', 'formular.fotos.max_anzahl muss mindestens 1 sein, wenn Fotos erlaubt sind');
+  }
+  if (K.formular.fotos.erlaubt && K.formular.fotos.max_anzahl * K.formular.fotos.max_mb > MAX_UPLOAD_MB) {
+    err('kunde.json', `formular.fotos: max_anzahl × max_mb darf höchstens ${MAX_UPLOAD_MB} MB ergeben (Upload-Grenze je Buchung)`);
   }
   const feldKeys = K.formular.zusatzfelder.map((f) => f.key);
   for (const d of duplicates(feldKeys)) err('kunde.json', `Zusatzfeld „${d}“ ist doppelt`);
