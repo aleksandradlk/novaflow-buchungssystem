@@ -4,11 +4,48 @@ Logbuch aller grundlegenden Entscheidungen für die Vorlage. Neue Einträge oben
 
 | Datum | Entscheidung | Begründung |
 |---|---|---|
+| 09.11.2026 | Update-Quelle von PocketBase ändert sich | siehe E-006 |
+| 09.11.2026 | Regeln für Kapazität, Verwalten und Kontakte (Details, die der Bauauftrag offen lässt) | siehe E-005 |
+| 09.11.2026 | Datenmodell: Ergänzungen zu Abschnitt 4 | siehe E-004 |
 | 09.11.2026 | Aufbau der Kundenkonfiguration (Details, die der Bauauftrag offen lässt) | siehe E-003 |
 | 09.11.2026 | Werkzeuge: Node.js für Prüfung/Start, Seiten ohne Build-Schritt, PocketBase v0.40.6 | siehe E-002 |
 | 09.11.2026 | PocketBase statt Postgres + eigenes Backend | siehe E-001 |
 
 ---
+
+## E-006 · 09.11.2026 · Update-Quelle von PocketBase ändert sich
+
+**Feststellung:** Im Changelog von v0.40.6 kündigt der Entwickler an, dass dies wahrscheinlich das letzte Release auf GitHub ist. Künftige Versionen sollen von einer anderen Adresse kommen, die es noch nicht gibt.
+
+**Entscheidung:** Wir bleiben bei v0.40.6. Vor dem nächsten Update prüfen wir die neue Quelle bewusst: Ist sie vertrauenswürdig? Gibt es Prüfsummen? Ist es weiterhin Open Source? Danach passen wir `kern/pocketbase-version.json` und `kern/tools/lib/pocketbase.mjs` an. Den eingebauten Update-Befehl von PocketBase nutzen wir nicht.
+
+## E-005 · 09.11.2026 · Regeln für Kapazität, Verwalten und Kontakte
+
+- **Slot-Belegung:** Es zählen alle aktiven Buchungen desselben Termintyps, die sich mit dem Slot **überschneiden**. Wenn Takt und Dauer gleich sind, heißt das: gleiche Startzeit.
+- **Tag:** `max_pro_tag` zählt die Buchungen des Termintyps an diesem Tag.
+- **Woche:** `max_pro_woche` zählt **alle** aktiven Buchungen der ISO-Woche (Montag bis Sonntag), also alle Termintypen einschließlich Folgeterminen.
+- **Ressource:** Jede aktive Buchung mit dieser Ressource im Buchungszeitraum (`buchbar_ab` bis `buchbar_bis`) belegt eine Einheit, und zwar für die ganze Saison. Gedacht ist das für Lagerplätze oder Boxen über den Winter. Folgetermine belegen keine Ressource.
+- **Doppelbuchung:** Prüfung und Speichern laufen in **einer** Transaktion. SQLite führt Schreib-Transaktionen nacheinander aus. Ein automatischer Test schickt 10 bzw. 8 gleichzeitige Anfragen auf den letzten Platz und erwartet genau einen Erfolg. Als Gegenprobe ohne Transaktion schlägt dieser Test fehl.
+- **Zeiten:** Regeln, Tage und Wochen gelten in der Zeitzone des Kunden, mit Sommer- und Winterzeit. Gespeichert und übertragen wird in UTC. Vergangene Slots werden nicht angeboten. Eine Mindest-Vorlaufzeit gibt es noch nicht (offene Frage).
+- **Verschieben/Absagen:** Online möglich bis zum Terminbeginn, aber nicht nach Abschluss und nicht nach einer Absage. Eine Absage setzt `abgesagt_am`, sie ist kein Status. Der Platz wird sofort wieder frei. Wird die Buchung abgesagt, wird auch ihr Folgetermin abgesagt.
+- **Folgetermin:** Nur für Angebote mit `folgetermin: true`, einmal pro Buchung, nur im Folgetermin-Zeitraum. Der Link ist der Verwalten-Link der ursprünglichen Buchung.
+- **Kontakte:** Kommt eine Buchung mit Kontakt-Token (aus einer Kampagnen-Mail), werden die Kontaktdaten aktualisiert. Kommt sie ohne Token, aber mit bekannter E-Mail, wird sie dem vorhandenen Kontakt zugeordnet. Dabei werden nur leere Felder ergänzt, damit niemand fremde Daten überschreiben kann. Einwilligungen werden nur hinzugefügt, mit Datum und Quelle `buchung`, und nie über das Formular entzogen. Eine neue E-Mail-Einwilligung hebt eine frühere Abmeldung auf.
+- **Benachrichtigungen:** Nach dem Speichern geht ein Webhook an die Automationen (Header `X-NF-Secret`, Zeitlimit 5 s). Schlägt er fehl, bleibt die Buchung trotzdem bestehen. Der Fehler wird ohne personenbezogene Daten protokolliert. Ein Nachholen fehlgeschlagener Benachrichtigungen ist offen für Phase 4.
+- **Rate-Limit pro IP:** Buchen 10/min, andere POST-Anfragen unter `/api/nf/` 20/min, alle `/api/nf/`-Anfragen 120/min. Fehler 429 und 413 kommen mit deutscher Meldung.
+- **Mitarbeiter:** Dürfen nur das Feld `status` ändern. Das ist zusätzlich im Hook abgesichert, nicht nur über die Zugriffsregel. Die Höchstzahl an Mitarbeitern kommt aus `rollen.max_mitarbeiter`. Mindestens ein Inhaber bleibt immer bestehen.
+
+## E-004 · 09.11.2026 · Datenmodell: Ergänzungen zu Abschnitt 4
+
+Abschnitt 4 des Bauauftrags ist umgesetzt. Ergänzt wurde nur, was die Routen brauchen:
+
+- **`einstellungen`** hat zusätzlich JSON-Felder für die Konfiguration, die die Routen zur Laufzeit lesen: `termintypen`, `status_liste`, `betrieb`, `module`, `formular`, `rollen`, `loeschfristen`, `nachrichten`, `rechtliches`, `mail_adapter`, `folgetermin_typ`. Die `hinweistexte` enthalten die Seitentexte in du- und Sie-Variante.
+- **Tagesdaten als Text** `JJJJ-MM-TT` (`buchbar_ab`, `sperrtage.datum`, `gueltig_von` …). Das vermeidet Zeitzonen-Verschiebungen bei reinen Kalendertagen. Termine (`termin_start/ende`) sind echte Zeitstempel in UTC.
+- **`angebote`:** zusätzlich `ressource` und `folgetermin` (siehe E-003).
+- **`buchungen`:** zusätzlich `abgesagt_am` (Absage, siehe E-005) und `ressourcen`. Letzteres ist eine Momentaufnahme der belegten Ressourcen zum Zeitpunkt der Buchung, damit spätere Änderungen am Angebot alte Buchungen nicht verändern.
+- **`kontakte`:** Nachfass-Zeitstempel als `nachfass_1_am` bis `nachfass_5_am` (höchstens 5 laut Schema).
+- **Tokens** (`kontakte.token`, `buchungen.token_verwalten`) sind 40 Zeichen lang und **versteckt**: Nur der Server sieht sie, auch Inhaber und Mitarbeiter nicht über die API.
+- **Fotos** sind geschützt: Abruf nur mit Datei-Token eines angemeldeten Nutzers. Erlaubt sind nur Bildformate. Die Grenzen pro Kunde kommen aus `formular.fotos`. Insgesamt sind höchstens 100 MB pro Buchung möglich, das wird schon bei der Konfigurationsprüfung kontrolliert.
+- **Startwerte-Import** über einen eigenen Konsolenbefehl `nf-startwerte`. Der Import läuft nur einmal. Mit `ersetzen` wird neu importiert, aber nur solange es keine Buchungen gibt.
 
 ## E-003 · 09.11.2026 · Aufbau der Kundenkonfiguration
 
