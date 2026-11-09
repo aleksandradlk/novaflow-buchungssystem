@@ -4,7 +4,7 @@ Vorlage für ein Online-Buchungssystem für Dienstleister mit festen Terminen (W
 
 Verbindliche Regeln: [`CLAUDE.md`](CLAUDE.md) · Vollständiger Auftrag: [`docs/BAUAUFTRAG_VORLAGE.md`](docs/BAUAUFTRAG_VORLAGE.md) · Entscheidungen: [`docs/ENTSCHEIDUNGEN.md`](docs/ENTSCHEIDUNGEN.md)
 
-> **Stand:** Phase 2 – Datenmodell, Zugriffsregeln und eigene Routen (API) stehen; Seiten folgen ab Phase 3. Die Module unten werden Phase für Phase gebaut.
+> **Stand:** Phase 3 – Buchungs-, Verwalten- und Abmeldeseite stehen (auf Datenmodell und API aus Phase 2); Mails folgen in Phase 4. Die Module unten werden Phase für Phase gebaut.
 
 ## Was die Vorlage kann
 
@@ -28,9 +28,9 @@ Datenschutz (DSGVO) ist fester Bestandteil: Hosting nur in Deutschland, keine ex
 ```
 kern/
   schema/                JSON-Schemas für die Kundenkonfiguration
-  web/buchung/           öffentliche Seiten (ab Phase 3, jetzt Platzhalter)
+  web/buchung/           öffentliche Seiten: Buchung (/), /verwalten/, /abmelden/
   web/uebersicht/        Login-Bereich (ab Phase 5, jetzt Platzhalter)
-  web/gemeinsam/         gemeinsames CSS
+  web/gemeinsam/         gemeinsames CSS, Kalender, Helfer, Standardtexte (texte.js)
   pb_migrations/         Datenmodell: Collections, Felder, Zugriffsregeln, Rate-Limit
   pb_hooks/              eigene Routen /api/nf/*, Status-Hook, Rollen, Startwerte-Import
     nf/slots.js          Slot-Berechnung (ohne Backend-Abhängigkeit, auch in Node getestet)
@@ -73,13 +73,27 @@ Weitere Befehle:
 | `npm run dev -- <kunde>` | anderen Kunden lokal starten |
 | `npm run dev -- <kunde> --startwerte-neu` | geänderte Konfiguration neu einlesen (nur solange es keine Buchungen gibt) |
 | `npm run check` | alle Kundenkonfigurationen prüfen (`npm run check -- <kunde>` für einen) |
-| `npm test` | automatisierte Tests (inkl. Tests gegen eine echte Instanz) |
+| `npm test` | automatisierte Tests (inkl. Tests gegen eine echte Instanz; Browser-Tests nur, wenn Playwright installiert ist – sonst übersprungen) |
 
 Port und Admin-Zugang lassen sich über eine lokale `.env` setzen (Vorlage: `.env.example`). Lokale Daten liegen in `.dev/<kunde>/pb_data` – zum Zurücksetzen einfach den Ordner `.dev/<kunde>` löschen.
 
 Benachrichtigungen an die Automationen (`NF_WEBHOOK_URL`, `NF_WEBHOOK_SECRET`) sind lokal optional; ohne Adresse werden sie übersprungen.
 
 Hinter einem Firmen-Proxy braucht der erste Download zusätzlich die Umgebungsvariable `NODE_USE_ENV_PROXY=1`.
+
+## Seiten
+
+| Adresse | Inhalt |
+|---|---|
+| `/` | Buchung in 4 Schritten: Angebot → Termin (Kalender, Ausgebuchtes ausgegraut) → Angaben (Fotos, Einwilligungen) → Bestätigung. `/?t=<Kontakt-Token>` füllt die Daten vor (Link aus Kampagnen-Mail). |
+| `/verwalten/?t=<Token>` | Termin ansehen, verschieben, absagen; Folgetermin buchen, wenn berechtigt |
+| `/abmelden/?t=<Kontakt-Token>` | Abmeldung von werblichen Mails per Knopf |
+
+Die Seiten sind reines HTML/CSS/JavaScript ohne Build-Schritt, ohne Cookies, ohne `localStorage` und ohne externe Aufrufe. Termine werden immer in der Zeitzone des Kunden angezeigt, egal wo das Gerät steht.
+
+**Texte:** Alle Texte der Seiten stehen neutral in `kern/web/gemeinsam/texte.js` (du- und Sie-Variante). Jeder Schlüssel daraus kann pro Kunde in `kunden/<kunde>/texte/seiten.json` überschrieben werden (beide Varianten). Die Ansprache kommt aus `kunde.json → ansprache`.
+
+**Branding:** Farben, Schrift und Logo kommen ausschließlich aus `kunden/<kunde>/branding/` (siehe Test „Branding und Ansprache kommen nur aus dem Kundenordner“).
 
 ## Schnittstelle (eigene Routen)
 
@@ -92,7 +106,7 @@ Hinter einem Firmen-Proxy braucht der erste Download zusätzlich die Umgebungsva
 | `POST /api/nf/buchen` | Buchung in einer Transaktion; JSON oder Multipart (`daten` = JSON, `fotos` = Dateien) |
 | `GET/POST /api/nf/verwalten?t=` | Termin ansehen, `{"aktion":"verschieben","start":…}` oder `{"aktion":"absagen"}` |
 | `GET/POST /api/nf/folgetermin?t=` | Folgetermin ansehen bzw. `{"start":…}` buchen (nur berechtigte Buchungen) |
-| `GET /api/nf/abmelden?t=` | Abmeldung von werblichen Mails |
+| `GET/POST /api/nf/abmelden?t=` | GET zeigt den Stand, erst POST meldet von werblichen Mails ab (Mailprogramme öffnen Links teils automatisch) |
 
 Zeiten werden als ISO-Zeitstempel (UTC) übergeben; Regeln, Tage und Wochen gelten in der Zeitzone des Kunden.
 

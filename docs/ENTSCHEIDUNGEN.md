@@ -4,6 +4,7 @@ Logbuch aller grundlegenden Entscheidungen für die Vorlage. Neue Einträge oben
 
 | Datum | Entscheidung | Begründung |
 |---|---|---|
+| 09.11.2026 | Öffentliche Seiten: Texte, Abmeldung, Kalender | siehe E-007 |
 | 09.11.2026 | Update-Quelle von PocketBase ändert sich | siehe E-006 |
 | 09.11.2026 | Regeln für Kapazität, Verwalten und Kontakte (Details, die der Bauauftrag offen lässt) | siehe E-005 |
 | 09.11.2026 | Datenmodell: Ergänzungen zu Abschnitt 4 | siehe E-004 |
@@ -12,6 +13,16 @@ Logbuch aller grundlegenden Entscheidungen für die Vorlage. Neue Einträge oben
 | 09.11.2026 | PocketBase statt Postgres + eigenes Backend | siehe E-001 |
 
 ---
+
+## E-007 · 09.11.2026 · Öffentliche Seiten: Texte, Abmeldung, Kalender
+
+- **Texte mit Standardwerten im Kern:** Beschriftungen wie „Weiter“, „Vorname“ oder „Termin absagen“ stehen neutral und ohne Branchenbegriffe in `kern/web/gemeinsam/texte.js`, jeweils in du- und Sie-Variante. Jeder Schlüssel ist pro Kunde in `texte/seiten.json` überschreibbar. So bleibt die Kundenkonfiguration klein, und der Kern enthält trotzdem nichts Kundenspezifisches.
+- **Abmeldung nur per Knopf:** `GET /api/nf/abmelden` zeigt nur den Stand. Erst `POST` meldet ab, ausgelöst durch den Knopf auf `/abmelden/`. Grund: Manche Mailprogramme und Virenscanner öffnen Links automatisch. Das weicht von Abschnitt 5 des Bauauftrags ab und wurde am 09.11.2026 freigegeben.
+- **Einwilligungen** werden nie vorausgewählt, auch wenn bereits eine Einwilligung besteht. Ein Haken ergänzt nur, er entzieht nichts (siehe E-005).
+- **Kalender:** Er öffnet im ersten buchbaren Monat und wählt den ersten freien Tag vor. Geschlossene (Sperrtag) und ausgebuchte Tage sowie volle Uhrzeiten sind ausgegraut, durchgestrichen und nicht wählbar; Screenreader lesen den Grund vor. Ist ein Termin beim Absenden inzwischen vergeben, geht es mit Hinweis zurück zur Terminwahl.
+- **Verlauf:** Die vier Schritte stehen im Browser-Verlauf (`history.pushState`), damit die Zurück-Taste am Handy funktioniert. Es wird nichts gespeichert.
+- **E-Mail-Prüfung** so streng wie das Datenbankfeld, damit ungültige Adressen eine Feldmeldung bekommen statt eines Serverfehlers. Gefunden durch einen Browser-Test mit `voll-08:00-a@…`.
+- **Weiterhin offen:** Mindest-Vorlaufzeit für Buchungen und eine Frist für Verschieben/Absagen. Beides ist nicht gebaut; im Moment gilt „ab jetzt“ bzw. „bis Terminbeginn“.
 
 ## E-006 · 09.11.2026 · Update-Quelle von PocketBase ändert sich
 
