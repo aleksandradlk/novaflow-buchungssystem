@@ -4,7 +4,9 @@
 
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { slot, startInstanz } from './hilfen.mjs';
+import { slot, startInstanz, testKonfiguration } from './hilfen.mjs';
+
+const BEISPIEL = testKonfiguration();
 
 let I;
 let einstellungenId;
@@ -40,7 +42,7 @@ async function adminHole(collection, filter) {
 }
 
 before(async () => {
-  I = await startInstanz();
+  I = await startInstanz({ env: { NF_NACHHOLEN_SOFORT: '1', NF_OEFFENTLICHE_URL: 'https://buchung.test' } });
   const r = await I.api('GET', '/api/collections/einstellungen/records', { token: I.adminToken });
   einstellungenId = r.json.items[0].id;
   // Rate limits are tested separately at the end.
@@ -147,8 +149,11 @@ describe('POST /api/nf/buchen', () => {
 
     const hook = I.webhooks.slice(vorher).find((w) => w.pfad === '/neue-buchung');
     assert.ok(hook, 'Webhook fehlt');
-    assert.equal(hook.secret, 'test-geheimnis');
-    assert.equal(hook.body.kontakt.email, 'einwilligung@example.com');
+    assert.equal(hook.secret, I.env.NF_WEBHOOK_SECRET);
+    assert.equal(hook.body.art, 'bestaetigung');
+    assert.equal(hook.body.kunde, '_beispiel');
+    assert.match(hook.body.schluessel, /^bestaetigung:[a-z0-9]+$/);
+    assert.doesNotMatch(JSON.stringify(hook.body), /@|Erika/, 'Webhook enthält keine personenbezogenen Daten');
 
     const [k] = await adminHole('kontakte', 'email = "einwilligung@example.com"');
     assert.equal(k.einwilligung_email, true);
@@ -254,7 +259,9 @@ describe('Verwalten', () => {
     assert.equal(await freiAm('2030-02-11', '09:00'), 1);
     const hook = I.webhooks.slice(vorher).find((w) => w.pfad === '/verschoben-abgesagt');
     assert.equal(hook.body.art, 'verschoben');
-    assert.equal(hook.body.alter_start, slot('2030-02-11', '08:00'));
+    const [mail] = await adminHole('nachrichten', `schluessel = "${hook.body.schluessel}"`);
+    assert.match(mail.betreff, /^Termin verschoben: Montag, 11\. Februar 2030, 09:00 Uhr$/);
+    assert.match(mail.text, /Bisheriger Termin: Montag, 11\. Februar 2030, 08:00 Uhr/);
 
     const ungueltig = await I.api('POST', `/api/nf/verwalten?t=${t}`, { body: { aktion: 'verschieben', start: slot('2030-02-11', '09:10') } });
     assert.equal(ungueltig.status, 409);
@@ -388,7 +395,7 @@ describe('Rollen und Zugriffsregeln', () => {
     assert.equal(log[0].status, 'in_arbeit');
     assert.notEqual(log[0].gesetzt_von, '');
     const hook = I.webhooks.slice(vorher).find((w) => w.pfad === '/status');
-    assert.equal(hook.body.status.code, 'in_arbeit');
+    assert.equal(hook.body.schluessel, `status:${log[0].id}`);
 
     const feld = await I.api('PATCH', `/api/collections/buchungen/records/${buchungId}`, { body: { bemerkung: 'x' }, token: mitarbeiter });
     assert.equal(feld.status, 403);
@@ -444,10 +451,137 @@ describe('Rate-Limit', () => {
   test('zu viele Buchungsversuche → 429 mit deutscher Meldung', async () => {
     const s = await I.api('PATCH', '/api/settings', { body: { rateLimits: { enabled: true } }, token: I.adminToken });
     assert.equal(s.status, 200, s.text);
-    const antworten = [];
-    for (let i = 0; i < 12; i++) antworten.push(await I.api('POST', '/api/nf/buchen', { body: {} }));
-    const limit = antworten.find((r) => r.status === 429);
-    assert.ok(limit, `kein 429: ${antworten.map((r) => r.status).join(',')}`);
-    assert.match(limit.json.message, /Zu viele Anfragen/);
+    try {
+      const antworten = [];
+      for (let i = 0; i < 12; i++) antworten.push(await I.api('POST', '/api/nf/buchen', { body: {} }));
+      const limit = antworten.find((r) => r.status === 429);
+      assert.ok(limit, `kein 429: ${antworten.map((r) => r.status).join(',')}`);
+      assert.match(limit.json.message, /Zu viele Anfragen/);
+    } finally {
+      await I.api('PATCH', '/api/settings', { body: { rateLimits: { enabled: false } }, token: I.adminToken });
+    }
+  });
+});
+
+describe('Nachrichten: Warteschlange und interne Routen für die Automationen', () => {
+  const intern = (methode, pfad, body, secret = I.env.NF_WEBHOOK_SECRET) => fetch(`${I.base}/api/nf-intern/${pfad}`, {
+    method: methode,
+    headers: { 'Content-Type': 'application/json', ...(secret ? { 'X-NF-Secret': secret } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  }).then(async (r) => ({ status: r.status, json: await r.json() }));
+
+  async function nachrichtZu(verwaltenToken, art) {
+    const v = await I.api('GET', `/api/collections/buchungen/records?filter=${encodeURIComponent(`token_verwalten = "${verwaltenToken}"`)}`, { token: I.adminToken });
+    const id = v.json.items[0].id;
+    const [n] = await adminHole('nachrichten', `buchung = "${id}" && art = "${art}"`);
+    return n;
+  }
+
+  test('ohne oder mit falschem Secret → 401', async () => {
+    assert.equal((await intern('GET', 'offen', null, null)).status, 401);
+    assert.equal((await intern('GET', 'offen', null, 'falsch-falsch-falsch-1')).status, 401);
+    assert.equal((await intern('POST', 'versand/start', { schluessel: 'x' }, null)).status, 401);
+  });
+
+  test('Bestätigung: Inhalt, Testmodus, Sperre gegen Doppelversand, Ergebnis', async () => {
+    const b = await buchen(slot('2030-02-18', '08:00'), { kontakt: { ...KONTAKT, email: 'mail@example.com', anrede: 'Frau' } });
+    const n = await nachrichtZu(b.json.verwalten_token, 'bestaetigung');
+    assert.equal(n.status, 'offen');
+    assert.equal(n.empfaenger, 'mail@example.com');
+
+    const start = await intern('POST', 'versand/start', { schluessel: n.schluessel });
+    assert.equal(start.status, 200);
+    const m = start.json;
+    assert.equal(m.senden, true);
+    assert.equal(m.modus, 'test');
+    assert.equal(m.empfaenger, BEISPIEL.nachrichten.test_empfaenger, 'Testmodus: an Test-Empfänger');
+    assert.equal(m.betreff, '[TEST → mail@example.com] Terminbestätigung: Montag, 18. Februar 2030, 08:00 Uhr');
+    assert.equal(m.absender.email, BEISPIEL.nachrichten.absender.email);
+    assert.equal(m.adapter, 'smtp');
+    assert.match(m.text, /^Guten Tag Frau Muster,/);
+    assert.match(m.text, new RegExp(`https://buchung\\.test/verwalten/\\?t=${b.json.verwalten_token}`));
+    assert.match(m.text, /Mit freundlichen Grüßen\nIhr Team vom /, 'Signatur des Kunden');
+    assert.match(m.html, new RegExp(`href="https://buchung\\.test/verwalten/\\?t=${b.json.verwalten_token}"`));
+    assert.doesNotMatch(m.html, /<img|src=|@import|url\(/, 'keine externen Inhalte in der Mail');
+
+    const zweiter = await intern('POST', 'versand/start', { schluessel: n.schluessel });
+    assert.equal(zweiter.json.senden, false, 'läuft gerade → kein zweiter Versand');
+
+    const ok = await intern('POST', 'versand/ergebnis', { schluessel: n.schluessel, ok: true, adapter: 'smtp' });
+    assert.equal(ok.json.status, 'gesendet');
+    const dritter = await intern('POST', 'versand/start', { schluessel: n.schluessel });
+    assert.deepEqual(dritter.json, { senden: false, grund: 'bereits gesendet' });
+  });
+
+  test('Fehler → Status fehler, landet in „offen“ zum Nachholen; nach 5 Versuchen aufgegeben', async () => {
+    const b = await buchen(slot('2030-02-18', '08:30'), { kontakt: { ...KONTAKT, email: 'fehler@example.com' } });
+    const n = await nachrichtZu(b.json.verwalten_token, 'bestaetigung');
+    for (let i = 1; i <= 5; i++) {
+      await intern('POST', 'versand/start', { schluessel: n.schluessel });
+      const r = await intern('POST', 'versand/ergebnis', { schluessel: n.schluessel, ok: false, fehler: '554 abgelehnt' });
+      assert.equal(r.json.status, 'fehler');
+      assert.equal(r.json.versuche, i);
+      assert.equal(r.json.aufgegeben, i === 5);
+      const offen = await intern('GET', 'offen');
+      assert.equal(offen.json.schluessel.includes(n.schluessel), i < 5, `Versuch ${i}`);
+    }
+  });
+
+  test('Erinnerungen: genau einmal für Termine in N Tagen', async () => {
+    const z = (await import('./hilfen.mjs')).zeitIntl('Europe/Berlin');
+    const heute = z.toLocal(Date.now()).datum;
+    const morgen = new Date(Date.parse(`${heute}T12:00:00Z`) + 86400000).toISOString().slice(0, 10);
+    const startMs = z.toUtcMs(morgen, '10:00');
+    const [kontakt] = await adminHole('kontakte', 'email = "erika@example.com"');
+    const [angebot] = await adminHole('angebote', 'code = "basis"');
+    const neu = await I.api('POST', '/api/collections/buchungen/records', {
+      token: I.adminToken,
+      body: {
+        kontakt: kontakt.id, angebot: angebot.id, termintyp: 'abgabe', status: 'eingegangen',
+        termin_start: new Date(startMs).toISOString(), termin_ende: new Date(startMs + 1800000).toISOString(),
+      },
+    });
+    assert.equal(neu.status, 200, neu.text);
+    const erster = await intern('POST', 'erinnerungen');
+    assert.ok(erster.json.schluessel.includes(`erinnerung:${neu.json.id}:1`), JSON.stringify(erster.json));
+    const [n] = await adminHole('nachrichten', `schluessel = "erinnerung:${neu.json.id}:1"`);
+    assert.equal(n.betreff, 'Erinnerung: Termin morgen');
+    const zweiter = await intern('POST', 'erinnerungen');
+    assert.ok(!zweiter.json.schluessel.includes(`erinnerung:${neu.json.id}:1`), 'kein zweites Mal');
+  });
+
+  test('Status-Mail: eigener Text des Kunden je Status; du/Sie-Umschaltung wirkt', async () => {
+    const b = await buchen(slot('2030-02-19', '08:00'), { kontakt: { ...KONTAKT, email: 'status@example.com' } });
+    const [rec] = await adminHole('buchungen', `token_verwalten = "${b.json.verwalten_token}"`);
+    await einstellungenSetzen({ ansprache: 'du' });
+    try {
+      assert.equal((await I.api('PATCH', `/api/collections/buchungen/records/${rec.id}`, { body: { status: 'fertig' }, token: I.adminToken })).status, 200);
+    } finally {
+      await einstellungenSetzen({ ansprache: 'sie' });
+    }
+    const [n] = await adminHole('nachrichten', `buchung = "${rec.id}" && art = "status"`);
+    assert.equal(n.betreff, 'Fertig zur Abholung');
+    assert.match(n.text, /^Hallo Erika,\n\ngute Nachricht: Dein Auftrag ist fertig\./);
+    assert.match(n.text, /Viele Grüße\nDein Team vom /);
+  });
+
+  test('Absage einer Buchung mit Folgetermin → zwei Absage-Mails; Modul aus → keine Mail', async () => {
+    const b = await buchen(slot('2030-02-19', '08:30'), { angebot: 'komplett', kontakt: { ...KONTAKT, email: 'absage@example.com' } });
+    const f = await I.api('POST', `/api/nf/folgetermin?t=${b.json.verwalten_token}`, { body: { start: slot('2030-04-08', '14:00') } });
+    assert.equal(f.status, 201);
+    assert.ok(await nachrichtZu(f.json.verwalten_token, 'folgetermin'), 'Folgetermin-Bestätigung');
+    await I.api('POST', `/api/nf/verwalten?t=${b.json.verwalten_token}`, { body: { aktion: 'absagen' } });
+    assert.ok(await nachrichtZu(b.json.verwalten_token, 'abgesagt'));
+    assert.ok(await nachrichtZu(f.json.verwalten_token, 'abgesagt'));
+
+    const r = await I.api('GET', '/api/collections/einstellungen/records', { token: I.adminToken });
+    const module = r.json.items[0].module;
+    await einstellungenSetzen({ module: { ...module, nachrichten: false } });
+    try {
+      const ohne = await buchen(slot('2030-02-19', '09:00'), { kontakt: { ...KONTAKT, email: 'ohne@example.com' } });
+      assert.equal(await nachrichtZu(ohne.json.verwalten_token, 'bestaetigung'), undefined);
+    } finally {
+      await einstellungenSetzen({ module });
+    }
   });
 });
