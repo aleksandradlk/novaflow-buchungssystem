@@ -4,6 +4,7 @@ Logbuch aller grundlegenden Entscheidungen für die Vorlage. Neue Einträge oben
 
 | Datum | Entscheidung | Begründung |
 |---|---|---|
+| 10.11.2026 | Server-Aufbau, Backups per systemd-Timer statt n8n, Admin-Zwei-Faktor, Löschfristen ergänzt | siehe E-012 |
 | 10.11.2026 | Kampagne, Nachfass, Folgetermin-Einladung, Import, Export, Löschung | siehe E-011 |
 | 10.11.2026 | Übersicht: Zwei-Faktor-Anmeldung, Sitzung, Kontakte, Touren | siehe E-010 |
 | 10.11.2026 | n8n-Version, Import und Testumgebung | siehe E-009 |
@@ -15,6 +16,31 @@ Logbuch aller grundlegenden Entscheidungen für die Vorlage. Neue Einträge oben
 | 09.11.2026 | Aufbau der Kundenkonfiguration (Details, die der Bauauftrag offen lässt) | siehe E-003 |
 | 09.11.2026 | Werkzeuge: Node.js für Prüfung/Start, Seiten ohne Build-Schritt, PocketBase v0.40.6 | siehe E-002 |
 | 09.11.2026 | PocketBase statt Postgres + eigenes Backend | siehe E-001 |
+
+---
+
+## E-012 · 10.11.2026 · Server-Aufbau, Backups, Admin-Zwei-Faktor, Löschfristen
+
+**Aufbau auf dem VPS** (Details: `docs/BETRIEB.md`)
+- Vorlage als git-Checkout unter `/opt/novaflow/vorlage`, je Instanz `/srv/novaflow/<instanz>/{app,pb_data}`, Secrets in `/etc/novaflow/<instanz>.env` (root, 600), Webserver-Block `/etc/caddy/novaflow/<instanz>.caddy` (per `import` im Caddyfile).
+- `app/` enthält **alles, was die Instanz ausführt** (Backend-Programm in der gepinnten Version, Hooks, Migrationen, Seiten, Startwerte, `version.json`). Es wird neben dem laufenden Stand gebaut und getauscht; der vorherige bleibt als `app.vorher`. Schlägt die Prüfung nach dem Ausrollen fehl, werden Dateien **und** Datenbank-Kopie automatisch zurückgelegt. Die Prüfung verlangt eine echte JSON-Antwort der eigenen Schnittstelle – die Seiten allein reichen nicht, weil die Startseite auch ohne geladene Hooks antwortet (in der Generalprobe nachgestellt).
+- Dienst `novaflow@<instanz>` als Benutzer `novaflow`, nur `pb_data` beschreibbar (`ProtectSystem=strict`), lauscht nur auf 127.0.0.1; `--automigrate=false`, damit Änderungen in der Admin-Oberfläche keine Migrationsdateien schreiben; CORS nur für die eigene Adresse.
+- Webserver: Admin-Oberfläche, interne Schnittstellen (`/api/nf-intern/*`, Superuser, Einstellungen, Backups, Logs, Crons, Batch, Realtime, Health) von außen **404**. `Server`-, `Via`-, `X-Powered-By`-Header entfernt; CSP nur `'self'` (die Seiten kommen ohne Inline-Skripte und -Stile aus, im Browser geprüft), HSTS, `nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`. **Eigener http→https-Block**, weil die automatische Umleitung des Webservers einen `Server`-Header mitschickt (in der Generalprobe gefunden). Der Webserver reicht die Client-Adresse als `X-Real-IP` weiter; die Instanz vertraut nur diesem Header (für die Zugriffsbegrenzung).
+
+**Abweichung vom Bauauftrag: Backups per systemd-Timer statt n8n-Workflow „backup-export“.** n8n 2.x hat den Baustein „Execute Command“ standardmäßig abgeschaltet; ihn einzuschalten würde jedem Workflow Shell-Zugriff geben. Der Timer (`novaflow-backup.timer`, täglich 02:30, also vor der Löschung um 03:00) macht dasselbe ohne diese Lücke: konsistente Kopie der Datenbank per SQLite-Backup-Schnittstelle im laufenden Betrieb + Fotos + Umgebungsdatei → restic (verschlüsselt, 30 täglich + 3 monatlich). Protokolle (`auxiliary.db`, enthält IP-Adressen) werden nicht gesichert. Fehler meldet `deploy/melden.sh` per Telegram (ohne personenbezogene Daten).
+- restic 0.19.1 wird mit Prüfsumme installiert (`deploy/versionen.sh`); Caddy kommt vom Server (getestet mit 2.11.9).
+- Wiederherstellung standardmäßig als **separate Testinstanz** (`--als`): eigener Port, keine Automationen-Adresse, neues Secret, Mail-Passwörter geleert – sie kann nichts versenden. Überschreiben der laufenden Instanz nur mit `--ueberschreiben`, alte Daten bleiben liegen.
+
+**Admin-Zugang (Superuser) mit zwei Faktoren:** Passwort + Code per Mail (über die Warteschlange, Workflow „anmeldung“), wird beim Start jeder Instanz erzwungen (`NF_SUPERUSER_2FA`, nur lokal mit `npm run dev` und in Tests abgeschaltet). Zusätzlich ist die Admin-Oberfläche nur per SSH-Tunnel erreichbar. Neue Konsole-Befehle: `nf-benutzer <email> <rolle>` (Übersicht-Zugang anlegen bzw. Passwort neu setzen, zufälliges Passwort, einmal angezeigt).
+
+**Löschfristen ergänzt** (von Aleksandra am 10.11.2026 bestätigt):
+- Kontakte, die **nie gebucht** haben und keine Einwilligung haben, werden nach `kontakte_ohne_buchung_monate` (Beispiel: 12) gelöscht; abgemeldete werden stattdessen reduziert (Sperrliste).
+- **Mail-Inhalte** (Text/HTML) versendeter, übersprungener oder endgültig fehlgeschlagener Nachrichten werden nach `mailinhalte_tage` (Beispiel: 30) geleert; Schlüssel, Art, Empfänger und Status bleiben als Nachweis.
+- Kein List-Unsubscribe-Header (bestätigt).
+
+**Generalprobe statt VPS-Zugriff:** Der Bau hat keinen Zugang zum VPS. Alle Skripte laufen deshalb in `kern/tools/test/deploy.test.mjs` gegen echten Caddy (TLS mit lokaler CA) und echtes restic – Anlegen, Header, Sperren mit Pfad-Tricks, Browser unter CSP, Buchung mit Foto, Backup, Wiederherstellung, Ausrollen mit Rollback, Entfernen. Abweichend vom Server ohne systemd und ohne eigenen Dienstbenutzer; die Einheiten prüft `systemd-analyze verify`. Das Ausrollen auf `demo.novaflowservices.de` macht Aleksandra nach `docs/BETRIEB.md`, Abschnitt 12.
+
+**Offen:** Wie n8n auf dem VPS läuft (npm/systemd oder Docker) – bei Docker braucht der Container `network_mode: host`, damit er die Instanzen auf 127.0.0.1 erreicht. Ablageort der Backups (`RESTIC_REPOSITORY`): voreingestellt lokal auf dem VPS; besser NovaFlow-eigener Speicher bei Hostinger.
 
 ---
 
@@ -36,7 +62,7 @@ Logbuch aller grundlegenden Entscheidungen für die Vorlage. Neue Einträge oben
 - Fotos abgeschlossener oder abgesagter Buchungen nach `fotos_monate_nach_abschluss`.
 - Abgeschlossene oder abgesagte Buchungen nach `buchungen_monate_nach_abschluss`, mit Status-Verlauf und Nachrichten; eine Buchung mit noch nicht fälligem Folgetermin bleibt.
 - Kontakte, deren letzte Buchung dabei gelöscht wurde: ohne Einwilligung → gelöscht; abgemeldet → auf E-Mail + Abmeldung reduziert (Sperrliste, damit ein späterer Import sie nicht wieder anschreibt); mit Einwilligung → bleiben für künftige Kampagnen.
-- **Offen:** Kontakte, die nie gebucht haben (z. B. importiert ohne Einwilligung), und Mail-Inhalte in `nachrichten` werden bisher nicht automatisch gelöscht.
+- **Offen** (in Phase 7 erledigt, siehe E-012): Kontakte, die nie gebucht haben (z. B. importiert ohne Einwilligung), und Mail-Inhalte in `nachrichten` werden bisher nicht automatisch gelöscht.
 
 **Anmeldecodes:** Das Backend erlaubt je Konto höchstens 5 Code-Anmeldungen in 3 Minuten (eingebauter Schutz gegen Durchprobieren) – gewollt; die Tests verteilen sich deshalb auf mehrere Konten.
 
