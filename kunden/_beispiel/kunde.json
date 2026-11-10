@@ -31,7 +31,9 @@
   },
   "loeschfristen": {
     "fotos_monate_nach_abschluss": 6,
-    "buchungen_monate_nach_abschluss": 24
+    "buchungen_monate_nach_abschluss": 24,
+    "kontakte_ohne_buchung_monate": 12,
+    "mailinhalte_tage": 30
   },
   "formular": {
     "adresse": "optional",

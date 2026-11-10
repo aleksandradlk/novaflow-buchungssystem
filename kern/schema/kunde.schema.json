@@ -164,6 +164,18 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 120
+        },
+        "kontakte_ohne_buchung_monate": {
+          "description": "Kontakte, die nie gebucht haben und keine Einwilligung haben: löschen nach so vielen Monaten (Standard 12)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120
+        },
+        "mailinhalte_tage": {
+          "description": "Inhalt gesendeter Mails leeren nach so vielen Tagen (Standard 30); der Schlüssel gegen Doppelversand bleibt",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365
         }
       }
     },

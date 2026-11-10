@@ -267,7 +267,7 @@ describe('Löschung nach Frist (verkürzt: Fotos 1 Monat, Buchungen 2 Monate)', 
 
     const r = await intern('loeschung');
     assert.equal(r.status, 200);
-    assert.deepEqual(r.json, { fotos: 2, buchungen: 2, kontakte_geloescht: 1, kontakte_reduziert: 1 });
+    assert.deepEqual(r.json, { fotos: 2, buchungen: 2, kontakte_geloescht: 1, kontakte_reduziert: 1, mailinhalte: 0 });
 
     const da = await admin('buchungen', `id = "${a.id}"`);
     assert.equal(da.length, 1, 'A bleibt (erst 45 Tage)');
@@ -281,6 +281,51 @@ describe('Löschung nach Frist (verkürzt: Fotos 1 Monat, Buchungen 2 Monate)', 
     const [de] = await admin('buchungen', `id = "${e.id}"`);
     assert.equal(de.fotos.length, 1, 'offene Buchung unberührt');
 
-    assert.deepEqual((await intern('loeschung')).json, { fotos: 0, buchungen: 0, kontakte_geloescht: 0, kontakte_reduziert: 0 });
+    assert.deepEqual((await intern('loeschung')).json, { fotos: 0, buchungen: 0, kontakte_geloescht: 0, kontakte_reduziert: 0, mailinhalte: 0 });
+  });
+});
+
+describe('Löschung: nie gebuchte Kontakte (12 Monate) und Mail-Inhalte (30 Tage)', () => {
+  let J;
+  const internJ = (pfad, body) => fetch(`${J.base}/api/nf-intern/${pfad}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-NF-Secret': J.env.NF_WEBHOOK_SECRET }, body: body ? JSON.stringify(body) : undefined,
+  }).then((r) => r.json());
+  const hole = async (c, filter) => (await J.api('GET', `/api/collections/${c}/records?perPage=200&filter=${encodeURIComponent(filter)}`, { token: J.adminToken })).json.items;
+
+  before(async () => {
+    // the deletion run sees "today + 400 days" – as if everything below was created long ago
+    J = await startInstanz({ env: { NF_LOESCHUNG_VERSATZ_TAGE: '400' } });
+  });
+  after(async () => { if (J) await J.stop(); });
+
+  test('ohne Einwilligung gelöscht, abgemeldet reduziert, mit Einwilligung bleibt; Mail-Inhalte geleert', async () => {
+    const imp = await J.api('POST', '/api/nf-team/import', {
+      token: J.adminToken,
+      body: { zeilen: [
+        { nr: 2, vorname: 'Ohne', nachname: 'Einwilligung', email: 'ohne@example.com', telefon: '0123' },
+        { nr: 3, vorname: 'Ab', nachname: 'Gemeldet', email: 'ab@example.com', telefon: '0123' },
+        { nr: 4, vorname: 'Mit', nachname: 'Einwilligung', email: 'mit@example.com', einwilligung_email: true },
+      ] },
+    });
+    assert.equal(imp.json.neu, 3, JSON.stringify(imp.json));
+    const [ab] = await hole('kontakte', 'email = "ab@example.com"');
+    await J.api('PATCH', `/api/collections/kontakte/records/${ab.id}`, { body: { abgemeldet: true }, token: J.adminToken });
+
+    const b = await J.api('POST', '/api/nf/buchen', { body: { angebot: 'basis', start: slot('2030-01-07', '08:00'), kontakt: { vorname: 'B', nachname: 'Bucher', email: 'bucher@example.com', telefon: '0123 4567' }, zusatzfelder: { zustand: 'Gut' } } });
+    assert.equal(b.status, 201);
+    const [n] = await hole('nachrichten', 'art = "bestaetigung"');
+    await internJ('versand/start', { schluessel: n.schluessel });
+    await internJ('versand/ergebnis', { schluessel: n.schluessel, ok: true });
+
+    const r = await internJ('loeschung');
+    assert.deepEqual(r, { fotos: 0, buchungen: 0, kontakte_geloescht: 1, kontakte_reduziert: 1, mailinhalte: 1 });
+    assert.equal((await hole('kontakte', 'email = "ohne@example.com"')).length, 0);
+    const [abNeu] = await hole('kontakte', 'email = "ab@example.com"');
+    assert.deepEqual([abNeu.vorname, abNeu.telefon, abNeu.abgemeldet], ['', '', true]);
+    assert.equal((await hole('kontakte', 'email = "mit@example.com"')).length, 1, 'mit Einwilligung bleibt');
+    assert.equal((await hole('kontakte', 'email = "bucher@example.com"')).length, 1, 'mit Buchung bleibt');
+    const [nNeu] = await hole('nachrichten', `schluessel = "${n.schluessel}"`);
+    assert.deepEqual([nNeu.text, nNeu.html, nNeu.status], ['', '', 'gesendet'], 'Inhalt leer, Schlüssel und Status bleiben');
+    assert.deepEqual(await internJ('loeschung'), { fotos: 0, buchungen: 0, kontakte_geloescht: 0, kontakte_reduziert: 0, mailinhalte: 0 });
   });
 });
