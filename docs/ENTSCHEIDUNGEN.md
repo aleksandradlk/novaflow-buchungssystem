@@ -4,6 +4,7 @@ Logbuch aller grundlegenden Entscheidungen für die Vorlage. Neue Einträge oben
 
 | Datum | Entscheidung | Begründung |
 |---|---|---|
+| 10.11.2026 | Kampagne, Nachfass, Folgetermin-Einladung, Import, Export, Löschung | siehe E-011 |
 | 10.11.2026 | Übersicht: Zwei-Faktor-Anmeldung, Sitzung, Kontakte, Touren | siehe E-010 |
 | 10.11.2026 | n8n-Version, Import und Testumgebung | siehe E-009 |
 | 10.11.2026 | Mailversand über Warteschlange (Outbox) in der Kundeninstanz | siehe E-008 |
@@ -16,6 +17,28 @@ Logbuch aller grundlegenden Entscheidungen für die Vorlage. Neue Einträge oben
 | 09.11.2026 | PocketBase statt Postgres + eigenes Backend | siehe E-001 |
 
 ---
+
+## E-011 · 10.11.2026 · Kampagne, Nachfass, Folgetermin-Einladung, Import, Export, Löschung
+
+**Kampagne und Nachfass (werblich)**
+- Empfänger: Kontakte mit E-Mail-Einwilligung, nicht abgemeldet, ohne aktive Buchung im aktuellen Buchungszeitraum. Jede Mail enthält einen persönlichen Buchungslink (`/?t=<Kontakt-Token>`, Daten vorausgefüllt) und einen Abmeldelink. Ein Start am selben Tag erzeugt nichts doppelt.
+- Massenmails entstehen als **geplant** und werden in **Etappen** freigegeben (Größe, Abstand und Versandfenster aus `nachrichten.json`). Beim Freigeben und nochmals beim Abholen zum Versand wird geprüft, ob die Person inzwischen abgemeldet ist, die Einwilligung fehlt oder sie schon gebucht hat → Status **übersprungen**.
+- **Nachfass:** höchstens eine Mail pro Kontakt und Lauf, die n-te erst, wenn die vorherige Mail n Tage alt ist (`abstaende_tage`), höchstens so viele wie Einträge. Wer bucht, bekommt keine weitere. Zeitstempel: `kontakte.kampagne_am`, `nachfass_n_am` (gesetzt erst nach erfolgreichem Versand).
+- Ein **List-Unsubscribe-Header** ist mit dem SMTP-Baustein von n8n nicht ohne Weiteres möglich; der Abmeldelink steht in jeder werblichen Mail (Text und HTML).
+
+**Folgetermin-Einladung** ist eine **Transaktionsmail** (gehört zum gebuchten Auftrag): an alle Buchungen eines Angebots mit `folgetermin: true`, nicht abgesagt, ohne Folgetermin – einmal pro Folgetermin-Zeitraum, ab `folgetermin_ab`, über die Etappen.
+
+**Import:** Die Datei (CSV oder Excel `.xlsx`, ohne Fremdbibliothek gelesen) bleibt im Browser des Inhabers; zur Instanz gehen nur die zugeordneten Zeilen (höchstens 1000 je Anfrage). Abgleich über die E-Mail: vorhandene Kontakte werden nur ergänzt, eine Abmeldung wird nie durch einen Import aufgehoben. Einwilligung nur, wenn die Datei sie ausweist und der Inhaber bestätigt, dass sie nachweisbar vorliegt; Quelle `import`, Datum aus der Datei oder Importzeitpunkt. Ohne E-Mail und ohne Telefon wird eine Zeile übersprungen.
+
+**Export:** ZIP mit einer CSV je Bereich (Semikolon, UTF-8 mit BOM → öffnet in Excel), optional mit Fotos; wird im Browser des Inhabers aus den Daten erstellt, die er ohnehin sehen darf. Zugangs-Tokens und Anmeldecodes sind nicht enthalten.
+
+**Löschung** (täglich 03:00):
+- Fotos abgeschlossener oder abgesagter Buchungen nach `fotos_monate_nach_abschluss`.
+- Abgeschlossene oder abgesagte Buchungen nach `buchungen_monate_nach_abschluss`, mit Status-Verlauf und Nachrichten; eine Buchung mit noch nicht fälligem Folgetermin bleibt.
+- Kontakte, deren letzte Buchung dabei gelöscht wurde: ohne Einwilligung → gelöscht; abgemeldet → auf E-Mail + Abmeldung reduziert (Sperrliste, damit ein späterer Import sie nicht wieder anschreibt); mit Einwilligung → bleiben für künftige Kampagnen.
+- **Offen:** Kontakte, die nie gebucht haben (z. B. importiert ohne Einwilligung), und Mail-Inhalte in `nachrichten` werden bisher nicht automatisch gelöscht.
+
+**Anmeldecodes:** Das Backend erlaubt je Konto höchstens 5 Code-Anmeldungen in 3 Minuten (eingebauter Schutz gegen Durchprobieren) – gewollt; die Tests verteilen sich deshalb auf mehrere Konten.
 
 ## E-010 · 10.11.2026 · Übersicht: Zwei-Faktor-Anmeldung, Sitzung, Kontakte, Touren
 

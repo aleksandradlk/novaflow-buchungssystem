@@ -4,7 +4,7 @@ Vorlage für ein Online-Buchungssystem für Dienstleister mit festen Terminen (W
 
 Verbindliche Regeln: [`CLAUDE.md`](CLAUDE.md) · Vollständiger Auftrag: [`docs/BAUAUFTRAG_VORLAGE.md`](docs/BAUAUFTRAG_VORLAGE.md) · Entscheidungen: [`docs/ENTSCHEIDUNGEN.md`](docs/ENTSCHEIDUNGEN.md)
 
-> **Stand:** Phase 5 – Buchungsseiten, API, Transaktionsmails über n8n und die Übersicht (Login-Bereich mit Touren und Verwaltung) stehen; Kampagne, Import, Export und Löschung folgen in Phase 6. Die Module unten werden Phase für Phase gebaut.
+> **Stand:** Phase 6 – alle Module der Vorlage sind gebaut (Buchung, Mails, Übersicht, Touren, Kampagne mit Nachfass, Folgetermin-Einladung, Import, Export, Löschung). Es folgt Phase 7: Server-Skripte und Betrieb. Die Module unten werden Phase für Phase gebaut.
 
 ## Was die Vorlage kann
 
@@ -106,7 +106,10 @@ Die Seiten sind reines HTML/CSS/JavaScript ohne Build-Schritt, ohne Cookies, ohn
 | **Status setzen** – Knöpfe aus `status.json`; ✉ = Kunde bekommt automatisch eine Mail | ✔ | ✔ |
 | **Kontakte** – Kontakte ohne Buchung im aktuellen Buchungszeitraum | ✔ | ✔ |
 | **Touren** – Termine mit Adresse einer Woche nach PLZ, Route als Google-Maps-Link (Modul `touren`) | ✔ | ✔ |
-| **Verwaltung** – Einstellungen, Angebote, Terminregeln, Sperrtage, Benutzer (Export folgt in Phase 6) | ✔ | – |
+| **Verwaltung** – Einstellungen, Angebote, Terminregeln, Sperrtage, Benutzer | ✔ | – |
+| **Import** – Kundenliste aus CSV oder Excel, Spalten zuordnen, Einwilligungen mit Quelle „import“ (Modul `import`) | ✔ | – |
+| **Kampagne** – Saison-Mail starten, Stand ansehen (Modul `kampagne`) | ✔ | – |
+| **Export** – ZIP mit einer CSV je Bereich, optional mit Fotos (Modul `export`) | ✔ | – |
 
 **Ersten Inhaber-Zugang anlegen** (bis die Deploy-Skripte in Phase 7 das übernehmen): im Admin-Bereich `/_/` unter `users` einen Datensatz mit `rolle = inhaber` anlegen. Weitere Zugänge legt der Inhaber danach selbst in der Verwaltung an (Mitarbeiter bis zur Grenze aus `kunde.json → rollen.max_mitarbeiter`).
 
@@ -121,6 +124,16 @@ Alle Mails laufen über eine **Warteschlange** in der Kundeninstanz:
 3. Der n8n-Workflow **Mail senden** holt die Mail ab, verschickt sie über **SMTP** oder **Microsoft 365** (Graph, Token wird zwischengespeichert) und meldet das Ergebnis zurück. Im Testmodus (`mail_modus = test`) geht alles an `test_empfaenger`, im Betreff steht der echte Empfänger.
    Anmeldecodes für die Übersicht laufen denselben Weg (Workflow **anmeldung**), gehen aber immer an die echte Adresse und werden nach dem Versand gelöscht.
 4. **erinnerungen** (täglich 08:00) legt Erinnerungen für Termine in N Tagen an (`nachrichten.json → erinnerungen_tage_vorher`). **nachholen** (alle 15 Min.) verschickt, was liegen geblieben oder fehlgeschlagen ist (bis zu 5 Versuche). Bei Fehlern geht eine Telegram-Nachricht ohne personenbezogene Daten an NovaFlow.
+
+**Kampagne, Nachfass, Folgetermin-Einladung** (Massenmails): werden zuerst *geplant* und dann vom Workflow **kampagne-etappen** in Paketen (`etappe_groesse`) im Abstand `etappe_abstand_minuten` innerhalb des `versandfenster` freigegeben (alles aus `nachrichten.json`).
+- **Kampagne** (Start in der Übersicht oder per Webhook `…/<kunde>/kampagne-start-jetzt`): an alle Kontakte mit E-Mail-Einwilligung, die nicht abgemeldet sind und im aktuellen Buchungszeitraum noch nicht gebucht haben – mit persönlichem Buchungslink (Daten vorausgefüllt) und Abmeldelink.
+- **Nachfass** (täglich): bis zu N Erinnerungen an Nicht-Bucher, N und Abstände aus `nachfass.abstaende_tage`.
+- **Folgetermin-Einladung** (täglich ab `folgetermin_ab`): an alle berechtigten Buchungen ohne Folgetermin – Transaktionsmail, keine Werbe-Einwilligung nötig.
+- Beim Versand wird erneut geprüft: wer sich inzwischen abgemeldet oder gebucht hat, wird übersprungen.
+
+**Löschung** (täglich nachts, Modul `loeschung`): Fotos nach `fotos_monate_nach_abschluss`, abgeschlossene oder abgesagte Buchungen nach `buchungen_monate_nach_abschluss` (eine Buchung mit noch offenem Folgetermin bleibt). Kontakte ohne verbleibende Buchung werden gelöscht, wenn sie keine Einwilligung haben; abgemeldete werden auf E-Mail + Abmeldung reduziert, damit sie nie wieder angeschrieben werden.
+
+**Workflows je Kunde** (nur für gebuchte Module): Mail senden, neue-buchung, verschoben-abgesagt, status, anmeldung, erinnerungen (08:00), nachholen (alle 15 Min.), kampagne-etappen, kampagne-start (nur von Hand), nachfass (09:30), folgetermin-einladung (09:00), loeschung (03:00).
 
 **Texte:** Standardtexte (neutral, du/Sie) in `kern/pb_hooks/nf/mail_standard.js`; jeder Schlüssel ist pro Kunde in `kunden/<kunde>/texte/mails.json` überschreibbar, auch eigene Texte je Status (`status_<code>_betreff`, `status_<code>_inhalt`). Platzhalter: `{{vorname}}`, `{{nachname}}`, `{{anrede_name}}`, `{{betrieb}}`, `{{angebot}}`, `{{termin}}`, `{{status}}`, `{{wann}}`, `{{verwalten_link}}` u. a. – Tippfehler meldet `npm run check`.
 
