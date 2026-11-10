@@ -4,6 +4,8 @@ Logbuch aller grundlegenden Entscheidungen für die Vorlage. Neue Einträge oben
 
 | Datum | Entscheidung | Begründung |
 |---|---|---|
+| 10.11.2026 | n8n-Version, Import und Testumgebung | siehe E-009 |
+| 10.11.2026 | Mailversand über Warteschlange (Outbox) in der Kundeninstanz | siehe E-008 |
 | 09.11.2026 | Öffentliche Seiten: Texte, Abmeldung, Kalender | siehe E-007 |
 | 09.11.2026 | Update-Quelle von PocketBase ändert sich | siehe E-006 |
 | 09.11.2026 | Regeln für Kapazität, Verwalten und Kontakte (Details, die der Bauauftrag offen lässt) | siehe E-005 |
@@ -13,6 +15,33 @@ Logbuch aller grundlegenden Entscheidungen für die Vorlage. Neue Einträge oben
 | 09.11.2026 | PocketBase statt Postgres + eigenes Backend | siehe E-001 |
 
 ---
+
+## E-009 · 10.11.2026 · n8n-Version, Import und Testumgebung
+
+- **Erprobt mit n8n 2.46.7** (aktuelle stabile Version am 10.11.2026). n8n 2.x braucht Node 24. Die Workflow-Vorlagen nutzen nur Standard-Bausteine (Webhook, Execute Workflow, HTTP Request, Send Email, If, Code, Schedule, Telegram).
+- **Import in 2.x:** Workflows werden nach `import:workflow` per `publish:workflow --id=…` aktiv; beim Import aktivieren (`--activeState=fromJson`) geht im normalen Betrieb nicht. Auch der Unter-Workflow „Mail senden“ muss veröffentlicht sein. `npm run n8n` gibt die Befehle in der erprobten Reihenfolge aus.
+- **Feste IDs** für Workflows und Zugangsdaten, abgeleitet aus der Kundenkennung: erneuter Import überschreibt statt zu verdoppeln. Telegram ist ein gemeinsamer NovaFlow-Zugang, alle anderen Zugangsdaten gibt es pro Kunde.
+- **Datensparsam:** erfolgreiche Ausführungen speichert n8n nicht (`saveDataSuccessExecution: none`); Webhooks tragen nur den Nachrichtenschlüssel.
+- **Testumgebung:** n8n ist **keine** Abhängigkeit des Repos (rund 3 GB). Der Ende-zu-Ende-Test läuft nur mit `NF_TEST_N8N_DIR` und sonst nicht.
+- **Offen:** Welche n8n-Version läuft auf dem VPS? Bei 1.x müssen Import-Befehle und evtl. Baustein-Versionen angepasst werden.
+
+## E-008 · 10.11.2026 · Mailversand über Warteschlange (Outbox) in der Kundeninstanz
+
+**Entscheidung:** Die Kundeninstanz erzeugt jede Mail selbst (Vorlagen-Engine `kern/pb_hooks/nf/mailvorlagen.js`) und legt sie in `nachrichten` ab, in derselben Transaktion wie die Buchung. n8n bekommt per Webhook nur den Schlüssel; „Mail senden“ holt die Mail über interne Routen (`/api/nf-intern/…`, Header `X-NF-Secret`), verschickt sie und meldet das Ergebnis.
+
+**Abweichung vom Bauauftrag (Abschnitt 7):** „Mail senden“ bekommt als Eingabe nur `schluessel` statt `empfaenger, betreff, html, …`. Die Instanz bleibt die einzige Quelle; Testmodus-Umleitung und Betreff-Präfix setzt sie beim Abholen.
+
+**Begründung:**
+- **Kein Doppelversand:** Der Schlüssel ist eindeutig (`bestaetigung:<id>`, `erinnerung:<id>:<N>`, `status:<log-id>` …). Das Abholen sperrt die Nachricht (`in_versand`), eine gesendete wird nie wieder abgegeben. Ein Test schaltet das ab und wird rot.
+- **Nichts geht verloren** (bestätigte Warteschlange aus Phase 2): Ist n8n nicht erreichbar oder schlägt der Versand fehl, holt „nachholen“ die Nachricht nach (offen > 2 Min., Fehler alle 15 Min., höchstens 5 Versuche, hängende Sendungen nach 30 Min.).
+- **Datenschutz:** Personenbezogene Daten verlassen die Instanz nur in der Mail selbst; Webhooks und Telegram enthalten keine.
+- **Testbar:** Vorlagen, Testmodus und Sperre sind ohne n8n mit Node-Tests prüfbar.
+
+**Weitere Festlegungen:**
+- **Erinnerungen** gehen an Termine, die genau N Tage entfernt sind (lokaler Kalendertag). Fällt ein Tageslauf aus, wird diese Erinnerung nicht nachträglich verschickt.
+- **Status-Mails** nur für Status mit `mail: true`, nicht für abgesagte Buchungen; nach erfolgreichem Versand wird `status_log.mail_gesendet` gesetzt.
+- **Pflichtangaben** (Firma, Anschrift, Kontakt) stehen im Fuß jeder Mail. Die HTML-Mails laden nichts von außen (keine Bilder, keine Schriften).
+- **Microsoft 365** über den n8n-Zugangstyp „OAuth2 API“ mit Client Credentials: n8n holt und speichert das Token selbst. Der Absendername kommt dort aus dem Postfach, nicht aus der Konfiguration.
 
 ## E-007 · 09.11.2026 · Öffentliche Seiten: Texte, Abmeldung, Kalender
 

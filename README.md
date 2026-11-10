@@ -4,7 +4,7 @@ Vorlage für ein Online-Buchungssystem für Dienstleister mit festen Terminen (W
 
 Verbindliche Regeln: [`CLAUDE.md`](CLAUDE.md) · Vollständiger Auftrag: [`docs/BAUAUFTRAG_VORLAGE.md`](docs/BAUAUFTRAG_VORLAGE.md) · Entscheidungen: [`docs/ENTSCHEIDUNGEN.md`](docs/ENTSCHEIDUNGEN.md)
 
-> **Stand:** Phase 3 – Buchungs-, Verwalten- und Abmeldeseite stehen (auf Datenmodell und API aus Phase 2); Mails folgen in Phase 4. Die Module unten werden Phase für Phase gebaut.
+> **Stand:** Phase 4 – Seiten, API und Transaktionsmails (Bestätigung, Folgetermin, Verschieben, Absage, Erinnerung, Status) über n8n stehen; Übersicht folgt in Phase 5. Die Module unten werden Phase für Phase gebaut.
 
 ## Was die Vorlage kann
 
@@ -34,7 +34,7 @@ kern/
   pb_migrations/         Datenmodell: Collections, Felder, Zugriffsregeln, Rate-Limit
   pb_hooks/              eigene Routen /api/nf/*, Status-Hook, Rollen, Startwerte-Import
     nf/slots.js          Slot-Berechnung (ohne Backend-Abhängigkeit, auch in Node getestet)
-  n8n/                   Automations-Vorlagen (ab Phase 4)
+  n8n/                   n8n-Vorlagen: Mail senden, neue-buchung, verschoben-abgesagt, status, erinnerungen, nachholen
   tools/                 Prüfung, lokaler Start, Tests
   pocketbase-version.json  gepinnte Backend-Version + SHA-256-Prüfsummen
 kunden/
@@ -73,7 +73,8 @@ Weitere Befehle:
 | `npm run dev -- <kunde>` | anderen Kunden lokal starten |
 | `npm run dev -- <kunde> --startwerte-neu` | geänderte Konfiguration neu einlesen (nur solange es keine Buchungen gibt) |
 | `npm run check` | alle Kundenkonfigurationen prüfen (`npm run check -- <kunde>` für einen) |
-| `npm test` | automatisierte Tests (inkl. Tests gegen eine echte Instanz; Browser-Tests nur, wenn Playwright installiert ist – sonst übersprungen) |
+| `npm run n8n -- <kunde>` | n8n-Importdateien des Kunden erzeugen (siehe „Mails und Automationen“) |
+| `npm test` | automatisierte Tests (inkl. Tests gegen eine echte Instanz). Browser-Tests nur mit Playwright, Mail-Ende-zu-Ende-Test nur mit `NF_TEST_N8N_DIR` – sonst übersprungen |
 
 Port und Admin-Zugang lassen sich über eine lokale `.env` setzen (Vorlage: `.env.example`). Lokale Daten liegen in `.dev/<kunde>/pb_data` – zum Zurücksetzen einfach den Ordner `.dev/<kunde>` löschen.
 
@@ -94,6 +95,33 @@ Die Seiten sind reines HTML/CSS/JavaScript ohne Build-Schritt, ohne Cookies, ohn
 **Texte:** Alle Texte der Seiten stehen neutral in `kern/web/gemeinsam/texte.js` (du- und Sie-Variante). Jeder Schlüssel daraus kann pro Kunde in `kunden/<kunde>/texte/seiten.json` überschrieben werden (beide Varianten). Die Ansprache kommt aus `kunde.json → ansprache`.
 
 **Branding:** Farben, Schrift und Logo kommen ausschließlich aus `kunden/<kunde>/branding/` (siehe Test „Branding und Ansprache kommen nur aus dem Kundenordner“).
+
+## Mails und Automationen
+
+Alle Mails laufen über eine **Warteschlange** in der Kundeninstanz:
+
+1. Bei einem Ereignis (Buchung, Folgetermin, Verschieben, Absage, Statuswechsel mit Mail-Flag) erzeugt die Instanz die fertige Mail (Text + HTML, du/Sie, Absender und Signatur des Kunden) und legt sie in `nachrichten` ab – mit eindeutigem Schlüssel, damit nichts doppelt verschickt wird.
+2. Ein Webhook an n8n meldet nur den Schlüssel (keine personenbezogenen Daten).
+3. Der n8n-Workflow **Mail senden** holt die Mail ab, verschickt sie über **SMTP** oder **Microsoft 365** (Graph, Token wird zwischengespeichert) und meldet das Ergebnis zurück. Im Testmodus (`mail_modus = test`) geht alles an `test_empfaenger`, im Betreff steht der echte Empfänger.
+4. **erinnerungen** (täglich 08:00) legt Erinnerungen für Termine in N Tagen an (`nachrichten.json → erinnerungen_tage_vorher`). **nachholen** (alle 15 Min.) verschickt, was liegen geblieben oder fehlgeschlagen ist (bis zu 5 Versuche). Bei Fehlern geht eine Telegram-Nachricht ohne personenbezogene Daten an NovaFlow.
+
+**Texte:** Standardtexte (neutral, du/Sie) in `kern/pb_hooks/nf/mail_standard.js`; jeder Schlüssel ist pro Kunde in `kunden/<kunde>/texte/mails.json` überschreibbar, auch eigene Texte je Status (`status_<code>_betreff`, `status_<code>_inhalt`). Platzhalter: `{{vorname}}`, `{{nachname}}`, `{{anrede_name}}`, `{{betrieb}}`, `{{angebot}}`, `{{termin}}`, `{{status}}`, `{{wann}}`, `{{verwalten_link}}` u. a. – Tippfehler meldet `npm run check`.
+
+**n8n einrichten (pro Kunde):**
+
+1. In `.env` die Werte für den Kunden setzen (`NF_WEBHOOK_SECRET`, `PB_PORT`, SMTP- oder Microsoft-365-Zugang, Telegram – siehe `.env.example`).
+2. `npm run n8n -- <kunde>` erzeugt `.dev/<kunde>/n8n/workflows.json` (ohne Secrets) und `credentials.json` (mit Secrets – nach dem Import löschen).
+3. Import wie vom Befehl ausgegeben: `import:credentials`, `import:workflow`, je Workflow `publish:workflow`, dann n8n neu starten. Erprobt mit n8n **2.46.7**.
+
+Zum sofortigen Auslösen gibt es die geschützten Webhooks `…/<kunde>/erinnerungen-jetzt` und `…/<kunde>/nachholen-jetzt` (Header `X-NF-Secret`).
+
+**Mail-Ende-zu-Ende-Test:** braucht eine n8n-Installation (mit passender Node-Version, n8n 2.x braucht Node 24) außerhalb des Repos:
+
+```
+NF_TEST_N8N_DIR=/pfad/zur/n8n-installation npm test
+```
+
+Der Test startet n8n abgeschottet (eigener Datenordner, nur 127.0.0.1), ein Test-Postfach und Attrappen für Microsoft 365 und Telegram – es geht nichts nach außen.
 
 ## Schnittstelle (eigene Routen)
 
@@ -123,6 +151,7 @@ Zeiten werden als ISO-Zeitstempel (UTC) übergeben; Regeln, Tage und Wochen gelt
    | `nachrichten.json` | Absender des Kunden, Versandweg, Test-/Live-Modus, Erinnerungen, Kampagnen-Etappen, Nachfass-Abstände |
    | `rechtliches.json` | Impressum- und Datenschutz-Link des Kunden, Einwilligungstexte |
    | `texte/seiten.json` | Seitentexte in du- und Sie-Variante |
+   | `texte/mails.json` | Mail-Texte in du- und Sie-Variante (mindestens Signatur; überschreibt die Standardtexte) |
    | `branding/` | `branding.json` (Farben, Schrift), Logo, ggf. Schriftdateien (WOFF2) |
 
 2. `npm run check -- <kunde>` – meldet Tippfehler, fehlende Felder, falsche Verweise (z. B. unbekannter Termintyp), Modul-Abhängigkeiten und zu geringen Farbkontrast.
