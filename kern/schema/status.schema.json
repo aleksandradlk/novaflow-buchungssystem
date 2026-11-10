@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "status.schema.json",
+  "title": "status.json – Statusliste",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "status": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "name",
+          "mail"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "common.schema.json#/$defs/code"
+          },
+          "name": {
+            "description": "Anzeigename (Übersicht und Mail)",
+            "$ref": "common.schema.json#/$defs/textKurz"
+          },
+          "mail": {
+            "description": "Statuswechsel löst Mail an den Endkunden aus",
+            "type": "boolean"
+          },
+          "start": {
+            "description": "Status direkt nach der Buchung (genau einer)",
+            "type": "boolean"
+          },
+          "abschluss": {
+            "description": "Setzt abgeschlossen_am (Start der Löschfristen)",
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+# Alert when an instance service fails (OnFailure of novaflow@.service).
+[Unit]
+Description=NovaFlow Meldung: %i ausgefallen
+
+[Service]
+Type=oneshot
+ExecStart=/opt/novaflow/vorlage/deploy/melden.sh "Dienst %i ist ausgefallen (journalctl -u novaflow@%i)"

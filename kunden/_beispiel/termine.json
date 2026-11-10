@@ -1,0 +1,67 @@
+{
+  "$schema": "../../kern/schema/termine.schema.json",
+  "zeitraum": {
+    "buchbar_ab": "2026-11-16",
+    "buchbar_bis": "2027-03-31"
+  },
+  "max_pro_woche": 50,
+  "folgetermin": {
+    "termintyp": "abholung",
+    "ab": "2027-03-01",
+    "bis": "2027-05-31"
+  },
+  "termintypen": [
+    {
+      "code": "abgabe",
+      "name": "Abgabe",
+      "dauer_minuten": 30,
+      "regeln": [
+        {
+          "wochentage": [1, 2, 3, 4, 5],
+          "von": "08:00",
+          "bis": "12:00",
+          "takt_minuten": 30,
+          "max_pro_slot": 2,
+          "max_pro_tag": 12
+        },
+        {
+          "wochentage": [6],
+          "von": "09:00",
+          "bis": "12:00",
+          "takt_minuten": 30,
+          "max_pro_slot": 1,
+          "max_pro_tag": 4
+        }
+      ]
+    },
+    {
+      "code": "abholung",
+      "name": "Abholung",
+      "dauer_minuten": 15,
+      "regeln": [
+        {
+          "wochentage": [1, 2, 3, 4, 5],
+          "von": "14:00",
+          "bis": "17:00",
+          "takt_minuten": 15,
+          "max_pro_slot": 2,
+          "max_pro_tag": 16
+        }
+      ]
+    }
+  ],
+  "ressourcen": [
+    {
+      "code": "stellplatz",
+      "name": "Stellplätze",
+      "kapazitaet": 20
+    }
+  ],
+  "sperrtage": [
+    { "datum": "2026-12-24", "grund": "Heiligabend" },
+    { "datum": "2026-12-25", "grund": "1. Weihnachtstag" },
+    { "datum": "2026-12-26", "grund": "2. Weihnachtstag" },
+    { "datum": "2026-12-31", "grund": "Silvester" },
+    { "datum": "2027-01-01", "grund": "Neujahr" }
+  ]
+}

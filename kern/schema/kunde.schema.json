@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kunde.schema.json",
+  "title": "kunde.json – Stammdaten, Module, Limits, Fristen",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kennung",
+    "name",
+    "firma",
+    "domain",
+    "zeitzone",
+    "ansprache",
+    "module",
+    "rollen",
+    "loeschfristen",
+    "formular"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "kennung": {
+      "description": "Eindeutige Kundenkennung = Ordnername unter kunden/. Wird für Dienstnamen und Webhook-Pfade verwendet.",
+      "type": "string",
+      "pattern": "^_?[a-z0-9][a-z0-9-]{1,39}$"
+    },
+    "name": {
+      "description": "Anzeigename des Betriebs (Seitentitel, Mails)",
+      "$ref": "common.schema.json#/$defs/textKurz"
+    },
+    "firma": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "strasse",
+        "plz",
+        "ort",
+        "email"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "common.schema.json#/$defs/textKurz"
+        },
+        "strasse": {
+          "$ref": "common.schema.json#/$defs/textKurz"
+        },
+        "plz": {
+          "type": "string",
+          "pattern": "^[0-9]{5}$"
+        },
+        "ort": {
+          "$ref": "common.schema.json#/$defs/textKurz"
+        },
+        "telefon": {
+          "type": "string",
+          "pattern": "^\\+?[0-9 ()/-]{6,30}$"
+        },
+        "email": {
+          "$ref": "common.schema.json#/$defs/email"
+        }
+      }
+    },
+    "domain": {
+      "description": "Domain der Buchungsseite, z. B. buchung.kunde.de",
+      "type": "string",
+      "format": "hostname",
+      "pattern": "^[a-z0-9.-]+\\.[a-z]{2,}$"
+    },
+    "zeitzone": {
+      "description": "IANA-Zeitzone, z. B. Europe/Berlin",
+      "type": "string",
+      "minLength": 3
+    },
+    "ansprache": {
+      "description": "Startwert der Ansprache",
+      "enum": [
+        "du",
+        "sie"
+      ]
+    },
+    "module": {
+      "description": "Gebuchte Module laut Projektvereinbarung",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "buchung",
+        "kapazitaet",
+        "nachrichten",
+        "kampagne",
+        "status",
+        "folgetermin",
+        "uebersicht",
+        "touren",
+        "import",
+        "export",
+        "loeschung"
+      ],
+      "properties": {
+        "buchung": {
+          "type": "boolean"
+        },
+        "kapazitaet": {
+          "type": "boolean"
+        },
+        "nachrichten": {
+          "type": "boolean"
+        },
+        "kampagne": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "boolean"
+        },
+        "folgetermin": {
+          "type": "boolean"
+        },
+        "uebersicht": {
+          "type": "boolean"
+        },
+        "touren": {
+          "type": "boolean"
+        },
+        "import": {
+          "type": "boolean"
+        },
+        "export": {
+          "type": "boolean"
+        },
+        "loeschung": {
+          "type": "boolean"
+        }
+      }
+    },
+    "rollen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_mitarbeiter"
+      ],
+      "properties": {
+        "max_mitarbeiter": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 50
+        }
+      }
+    },
+    "loeschfristen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fotos_monate_nach_abschluss",
+        "buchungen_monate_nach_abschluss"
+      ],
+      "properties": {
+        "fotos_monate_nach_abschluss": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120
+        },
+        "buchungen_monate_nach_abschluss": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120
+        },
+        "kontakte_ohne_buchung_monate": {
+          "description": "Kontakte, die nie gebucht haben und keine Einwilligung haben: löschen nach so vielen Monaten (Standard 12)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120
+        },
+        "mailinhalte_tage": {
+          "description": "Inhalt gesendeter Mails leeren nach so vielen Tagen (Standard 30); der Schlüssel gegen Doppelversand bleibt",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365
+        }
+      }
+    },
+    "formular": {
+      "description": "Felder der Buchungsseite (Schritt Daten)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adresse",
+        "telefon",
+        "fotos",
+        "zusatzfelder"
+      ],
+      "properties": {
+        "adresse": {
+          "description": "Adresse (Straße, PLZ, Ort) abfragen",
+          "enum": [
+            "pflicht",
+            "optional",
+            "aus"
+          ]
+        },
+        "telefon": {
+          "enum": [
+            "pflicht",
+            "optional",
+            "aus"
+          ]
+        },
+        "fotos": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "erlaubt",
+            "max_anzahl",
+            "max_mb"
+          ],
+          "properties": {
+            "erlaubt": {
+              "type": "boolean"
+            },
+            "max_anzahl": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 20
+            },
+            "max_mb": {
+              "description": "Maximale Größe je Foto in MB",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25
+            }
+          }
+        },
+        "zusatzfelder": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "label",
+              "typ",
+              "pflicht",
+              "ziel"
+            ],
+            "properties": {
+              "key": {
+                "$ref": "common.schema.json#/$defs/code"
+              },
+              "label": {
+                "$ref": "common.schema.json#/$defs/textKurz"
+              },
+              "typ": {
+                "enum": [
+                  "text",
+                  "mehrzeilig",
+                  "zahl",
+                  "auswahl"
+                ]
+              },
+              "pflicht": {
+                "type": "boolean"
+              },
+              "ziel": {
+                "description": "Gespeichert am Kontakt (bleibt für künftige Buchungen) oder an der einzelnen Buchung",
+                "enum": [
+                  "kontakt",
+                  "buchung"
+                ]
+              },
+              "optionen": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "common.schema.json#/$defs/textKurz"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "typ": {
+                  "const": "auswahl"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "optionen"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "optionen"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

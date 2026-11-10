@@ -23,6 +23,7 @@ backups/
 !docs/**/*.pdf
 
 # Binaries / Downloads
+.dev/
 pocketbase
 pocketbase.exe
 *.zip

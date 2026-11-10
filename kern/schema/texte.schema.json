@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "texte.schema.json",
+  "title": "texte/seiten.json – Seitentexte in du- und Sie-Variante",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "du",
+    "sie"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "du": {
+      "$ref": "#/$defs/textblock"
+    },
+    "sie": {
+      "$ref": "#/$defs/textblock"
+    }
+  },
+  "$defs": {
+    "textblock": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "$ref": "common.schema.json#/$defs/code"
+      },
+      "additionalProperties": {
+        "$ref": "common.schema.json#/$defs/textLang"
+      }
+    }
+  }
+}

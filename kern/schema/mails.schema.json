@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mails.schema.json",
+  "title": "texte/mails.json – Mail-Texte in du- und Sie-Variante (überschreiben die Standardtexte)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "du",
+    "sie"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "du": {
+      "$ref": "#/$defs/textblock"
+    },
+    "sie": {
+      "$ref": "#/$defs/textblock"
+    }
+  },
+  "$defs": {
+    "textblock": {
+      "type": "object",
+      "minProperties": 0,
+      "propertyNames": {
+        "$ref": "common.schema.json#/$defs/code"
+      },
+      "additionalProperties": {
+        "$ref": "common.schema.json#/$defs/textLang"
+      },
+      "description": "Schlüssel wie bestaetigung_betreff, bestaetigung_inhalt, anrede, signatur, status_<code>_inhalt"
+    }
+  }
+}

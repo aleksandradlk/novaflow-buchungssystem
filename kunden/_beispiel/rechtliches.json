@@ -1,0 +1,14 @@
+{
+  "$schema": "../../kern/schema/rechtliches.schema.json",
+  "impressum_url": "https://musterbetrieb.example/impressum",
+  "datenschutz_url": "https://musterbetrieb.example/datenschutz",
+  "einwilligungen": [
+    {
+      "kanal": "email",
+      "text": {
+        "du": "Ja, ich möchte vom Musterbetrieb per E-Mail über Saisonangebote und freie Termine informiert werden. Ich kann das jederzeit über den Abmeldelink in jeder E-Mail widerrufen.",
+        "sie": "Ja, ich möchte vom Musterbetrieb per E-Mail über Saisonangebote und freie Termine informiert werden. Ich kann das jederzeit über den Abmeldelink in jeder E-Mail widerrufen."
+      }
+    }
+  ]
+}

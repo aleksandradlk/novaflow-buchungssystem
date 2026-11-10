@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" role="img" aria-label="Musterbetrieb">
+  <rect x="0" y="0" width="48" height="48" rx="10" fill="#1f5f5b"/>
+  <path d="M12 35V13h5l7 11 7-11h5v22h-5V22l-7 10-7-10v13z" fill="#ffffff"/>
+  <text x="60" y="32" font-family="system-ui, sans-serif" font-size="22" font-weight="600" fill="#1c1c1a">Musterbetrieb</text>
+</svg>

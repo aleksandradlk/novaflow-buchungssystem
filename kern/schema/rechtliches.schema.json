@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rechtliches.schema.json",
+  "title": "rechtliches.json – Impressum, Datenschutz, Einwilligungstexte",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "impressum_url",
+    "datenschutz_url",
+    "einwilligungen"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "impressum_url": {
+      "$ref": "common.schema.json#/$defs/httpsUrl"
+    },
+    "datenschutz_url": {
+      "$ref": "common.schema.json#/$defs/httpsUrl"
+    },
+    "einwilligungen": {
+      "description": "Je Kanal eine eigene, nicht vorausgewählte Einwilligung",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kanal",
+          "text"
+        ],
+        "properties": {
+          "kanal": {
+            "enum": [
+              "email",
+              "whatsapp"
+            ]
+          },
+          "text": {
+            "$ref": "common.schema.json#/$defs/duSie"
+          }
+        }
+      }
+    }
+  }
+}

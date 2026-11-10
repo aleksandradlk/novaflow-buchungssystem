@@ -1,0 +1,19 @@
+{
+  "$schema": "../../kern/schema/nachrichten.schema.json",
+  "absender": {
+    "name": "Musterbetrieb",
+    "email": "termine@musterbetrieb.example"
+  },
+  "adapter": "smtp",
+  "modus": "test",
+  "test_empfaenger": "test@musterbetrieb.example",
+  "erinnerungen_tage_vorher": [3, 1],
+  "kampagne": {
+    "etappe_groesse": 50,
+    "etappe_abstand_minuten": 30,
+    "versandfenster": { "von": "09:00", "bis": "18:00" }
+  },
+  "nachfass": {
+    "abstaende_tage": [7, 14]
+  }
+}

@@ -1,0 +1,244 @@
+// Registrations only – the logic lives in nf/*.js.
+// Handlers run in isolated VMs, so every handler requires its modules itself.
+
+// ---------------------------------------------------------------- error translation for /api/nf/*
+// Runs before the built-in rate limiter (-1000) and body limit (-990) and translates their
+// English errors; anything else unexpected becomes a German 500 without technical details.
+routerUse(new Middleware((e) => {
+  if (!e.request.url.path.startsWith("/api/nf/")) return e.next();
+  const basis = require(`${__hooks}/nf/basis.js`);
+  try {
+    return e.next();
+  } catch (err) {
+    const api = basis.apiFehler(err);
+    if (api) {
+      if (api.status === 429) throw basis.fehler(429, basis.MELDUNG.zuViele);
+      if (api.status === 413) throw basis.fehler(413, basis.MELDUNG.zuGross);
+      throw api;
+    }
+    $app.logger().error("nf unexpected error", "path", e.request.url.path, "error", String(err));
+    throw basis.fehler(500, basis.MELDUNG.intern);
+  }
+}, -1005, "nfFehler"));
+
+// ---------------------------------------------------------------- public routes (section 5)
+routerAdd("GET", "/api/nf/angebot", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/routen.js`).angebot(e));
+});
+
+routerAdd("GET", "/api/nf/slots", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/routen.js`).slots(e));
+});
+
+routerAdd("POST", "/api/nf/buchen", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/routen.js`).buchen(e));
+}, $apis.bodyLimit(110 * 1024 * 1024)); // fits max_anzahl × max_mb ≤ 100 MB (checked in kern/tools)
+
+routerAdd("GET", "/api/nf/verwalten", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/routen.js`).verwaltenLesen(e));
+});
+
+routerAdd("POST", "/api/nf/verwalten", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/routen.js`).verwaltenAendern(e));
+});
+
+routerAdd("GET", "/api/nf/folgetermin", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/routen.js`).folgeterminLesen(e));
+});
+
+routerAdd("POST", "/api/nf/folgetermin", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/routen.js`).folgeterminBuchen(e));
+});
+
+routerAdd("GET", "/api/nf/abmelden", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/routen.js`).abmeldenLesen(e));
+});
+
+routerAdd("POST", "/api/nf/abmelden", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/routen.js`).abmelden(e));
+});
+
+// ---------------------------------------------------------------- internal routes for the automation
+// Header X-NF-Secret required; blocked from outside by the web server (phase 7).
+
+routerAdd("POST", "/api/nf-intern/versand/start", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/nachrichten.js`).versandStart(e));
+});
+
+routerAdd("POST", "/api/nf-intern/versand/ergebnis", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/nachrichten.js`).versandErgebnis(e));
+});
+
+routerAdd("POST", "/api/nf-intern/erinnerungen", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/nachrichten.js`).erinnerungen(e));
+});
+
+routerAdd("GET", "/api/nf-intern/offen", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/nachrichten.js`).offen(e));
+});
+
+routerAdd("POST", "/api/nf-intern/kampagne/start", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    require(`${__hooks}/nf/nachrichten.js`).pruefeSecret(e);
+    return e.json(200, require(`${__hooks}/nf/kampagne.js`).starten($app));
+  });
+});
+
+routerAdd("POST", "/api/nf-intern/etappe", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    require(`${__hooks}/nf/nachrichten.js`).pruefeSecret(e);
+    return e.json(200, require(`${__hooks}/nf/kampagne.js`).etappe($app));
+  });
+});
+
+routerAdd("POST", "/api/nf-intern/nachfass", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    require(`${__hooks}/nf/nachrichten.js`).pruefeSecret(e);
+    return e.json(200, require(`${__hooks}/nf/kampagne.js`).nachfass($app));
+  });
+});
+
+routerAdd("POST", "/api/nf-intern/folgetermin-einladungen", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    require(`${__hooks}/nf/nachrichten.js`).pruefeSecret(e);
+    return e.json(200, require(`${__hooks}/nf/kampagne.js`).folgeterminEinladungen($app));
+  });
+});
+
+routerAdd("POST", "/api/nf-intern/loeschung", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    require(`${__hooks}/nf/nachrichten.js`).pruefeSecret(e);
+    return e.json(200, require(`${__hooks}/nf/loeschung.js`).ausfuehren($app));
+  });
+});
+
+// ---------------------------------------------------------------- routes for the overview (owner only)
+
+routerAdd("POST", "/api/nf-team/import", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    basis.nurInhaber(e);
+    const body = e.requestInfo().body || {};
+    return e.json(200, require(`${__hooks}/nf/import.js`).importieren($app, body.zeilen));
+  });
+}, $apis.requireAuth(), $apis.bodyLimit(10 * 1024 * 1024));
+
+routerAdd("POST", "/api/nf-team/kampagne/start", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    basis.nurInhaber(e);
+    return e.json(200, require(`${__hooks}/nf/kampagne.js`).starten($app));
+  });
+}, $apis.requireAuth());
+
+routerAdd("GET", "/api/nf-team/kampagne/stand", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    basis.nurInhaber(e);
+    return e.json(200, require(`${__hooks}/nf/kampagne.js`).stand($app));
+  });
+}, $apis.requireAuth());
+
+// ---------------------------------------------------------------- record hooks
+onRecordUpdateRequest((e) => {
+  require(`${__hooks}/nf/datensaetze.js`).buchungAktualisieren(e);
+}, "buchungen");
+
+onRecordCreateRequest((e) => {
+  require(`${__hooks}/nf/datensaetze.js`).benutzerAnlegen(e);
+}, "users");
+
+onRecordUpdateRequest((e) => {
+  require(`${__hooks}/nf/datensaetze.js`).benutzerAktualisieren(e);
+}, "users");
+
+onRecordDeleteRequest((e) => {
+  require(`${__hooks}/nf/datensaetze.js`).benutzerLoeschen(e);
+}, "users");
+
+onRecordCreate((e) => {
+  require(`${__hooks}/nf/datensaetze.js`).tokenSetzen("token")(e);
+}, "kontakte");
+
+// Admin access with two factors (CLAUDE.md). Always on, except NF_SUPERUSER_2FA=0 (tests, local).
+onBootstrap((e) => {
+  e.next();
+  const an = $os.getenv("NF_SUPERUSER_2FA") !== "0";
+  const su = e.app.findCollectionByNameOrId("_superusers");
+  if (su.mfa.enabled !== an || su.otp.enabled !== an) {
+    su.mfa.enabled = an;
+    su.otp.enabled = an;
+    e.app.save(su);
+  }
+});
+
+// Two-factor login: the one-time code goes through the outbox, not the backend mailer.
+onMailerRecordOTPSend((e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  const nachrichten = require(`${__hooks}/nf/nachrichten.js`);
+  const cfg = basis.einstellungen(e.app);
+  const rec = nachrichten.anmeldecode(e.app, cfg, e.record, e.meta.otpId, e.meta.password);
+  nachrichten.melden(cfg, rec);
+  // deliberately no e.next(): the backend must not send this mail itself
+}, "users", "_superusers");
+
+onRecordCreate((e) => {
+  require(`${__hooks}/nf/datensaetze.js`).tokenSetzen("token_verwalten")(e);
+}, "buchungen");
+
+// ---------------------------------------------------------------- console commands
+
+// nf-benutzer <email> <inhaber|mitarbeiter> [name] – creates the account or sets a new password.
+// The password is printed once; login additionally needs the code by e-mail.
+$app.rootCmd.addCommand(new Command({
+  use: "nf-benutzer <email> <rolle> [name]",
+  short: "Zugang für die Übersicht anlegen oder Passwort neu setzen",
+  run: (cmd, args) => {
+    if (!args || args.length < 2) throw new Error("Aufruf: nf-benutzer <email> <inhaber|mitarbeiter> [name]");
+    const email = String(args[0]).toLowerCase();
+    const rolle = args[1];
+    if (["inhaber", "mitarbeiter"].indexOf(rolle) === -1) throw new Error("Rolle muss inhaber oder mitarbeiter sein.");
+    let rec;
+    try {
+      rec = $app.findAuthRecordByEmail("users", email);
+    } catch (_) {
+      rec = new Record($app.findCollectionByNameOrId("users"));
+      rec.set("email", email);
+    }
+    const passwort = $security.randomStringWithAlphabet(20, "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789");
+    rec.set("rolle", rolle);
+    if (args[2]) rec.set("name", args.slice(2).join(" "));
+    rec.set("verified", true);
+    rec.setPassword(passwort);
+    $app.save(rec);
+    console.log("Zugang " + email + " (" + rolle + ") – Passwort (nur jetzt sichtbar): " + passwort);
+  },
+}));
+
+// ---------------------------------------------------------------- console command
+$app.rootCmd.addCommand(new Command({
+  use: "nf-startwerte <datei> [ersetzen]",
+  short: "Startwerte aus der Kundenkonfiguration importieren",
+  run: (cmd, args) => {
+    if (!args || args.length < 1) throw new Error("Pfad zur Startwerte-Datei fehlt.");
+    require(`${__hooks}/nf/startwerte.js`).importieren($app, args[0], args[1] === "ersetzen");
+  },
+}));

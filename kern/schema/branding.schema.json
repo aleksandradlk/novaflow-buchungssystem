@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "branding.schema.json",
+  "title": "branding/branding.json – Logo, Farben, Schrift",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "logo",
+    "farben",
+    "schrift"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "logo": {
+      "description": "Dateiname im Ordner branding/ (SVG, PNG oder WebP)",
+      "allOf": [
+        {
+          "$ref": "common.schema.json#/$defs/dateiname"
+        },
+        {
+          "pattern": "\\.(svg|png|webp)$"
+        }
+      ]
+    },
+    "farben": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primaer",
+        "auf_primaer",
+        "akzent",
+        "hintergrund",
+        "flaeche",
+        "text",
+        "rahmen"
+      ],
+      "properties": {
+        "primaer": {
+          "description": "Hauptfarbe (Buttons, Auswahl)",
+          "$ref": "common.schema.json#/$defs/farbe"
+        },
+        "auf_primaer": {
+          "description": "Schrift auf Hauptfarbe",
+          "$ref": "common.schema.json#/$defs/farbe"
+        },
+        "akzent": {
+          "$ref": "common.schema.json#/$defs/farbe"
+        },
+        "hintergrund": {
+          "$ref": "common.schema.json#/$defs/farbe"
+        },
+        "flaeche": {
+          "description": "Karten und Formularflächen",
+          "$ref": "common.schema.json#/$defs/farbe"
+        },
+        "text": {
+          "$ref": "common.schema.json#/$defs/farbe"
+        },
+        "rahmen": {
+          "$ref": "common.schema.json#/$defs/farbe"
+        }
+      }
+    },
+    "schrift": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "familie",
+        "dateien"
+      ],
+      "properties": {
+        "familie": {
+          "description": "Schriftname oder \"system\" für Systemschrift",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9 -]{2,60}$"
+        },
+        "dateien": {
+          "description": "Lokale Schriftdateien (nur WOFF2) im Ordner branding/",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "datei",
+              "gewicht",
+              "stil"
+            ],
+            "properties": {
+              "datei": {
+                "allOf": [
+                  {
+                    "$ref": "common.schema.json#/$defs/dateiname"
+                  },
+                  {
+                    "pattern": "\\.woff2$"
+                  }
+                ]
+              },
+              "gewicht": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 900,
+                "multipleOf": 100
+              },
+              "stil": {
+                "enum": [
+                  "normal",
+                  "italic"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

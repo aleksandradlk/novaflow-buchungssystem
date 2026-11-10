@@ -1,0 +1,21 @@
+{
+  "name": "novaflow-buchungssystem",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vorlage für das NovaFlow-Buchungssystem",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "node kern/tools/dev.mjs",
+    "check": "node kern/tools/check-config.mjs",
+    "n8n": "node kern/tools/n8n.mjs",
+    "test": "node --test \"kern/tools/test/*.test.mjs\""
+  },
+  "dependencies": {
+    "adm-zip": "0.6.1",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  }
+}

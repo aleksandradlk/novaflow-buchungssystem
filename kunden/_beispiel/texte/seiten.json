@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../kern/schema/texte.schema.json",
+  "du": {
+    "titel": "Termin buchen",
+    "einleitung": "Wähle dein Paket und einen passenden Termin – das dauert nur zwei Minuten.",
+    "schritt_angebot": "Was dürfen wir für dich tun?",
+    "schritt_termin": "Wann passt es dir?",
+    "schritt_daten": "Deine Angaben",
+    "bestaetigung": "Danke, {{vorname}}! Dein Termin ist gebucht. Die Bestätigung kommt gleich per E-Mail."
+  },
+  "sie": {
+    "titel": "Termin buchen",
+    "einleitung": "Wählen Sie Ihr Paket und einen passenden Termin – das dauert nur zwei Minuten.",
+    "schritt_angebot": "Was dürfen wir für Sie tun?",
+    "schritt_termin": "Wann passt es Ihnen?",
+    "schritt_daten": "Ihre Angaben",
+    "bestaetigung": "Vielen Dank, {{vorname}}! Ihr Termin ist gebucht. Die Bestätigung kommt gleich per E-Mail."
+  }
+}

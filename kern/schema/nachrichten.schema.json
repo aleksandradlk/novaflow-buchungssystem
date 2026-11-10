@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "nachrichten.schema.json",
+  "title": "nachrichten.json – Absender, Versand, Erinnerungen, Kampagne",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "absender",
+    "adapter",
+    "modus",
+    "test_empfaenger",
+    "erinnerungen_tage_vorher",
+    "kampagne",
+    "nachfass"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "absender": {
+      "description": "Absender ist immer der Kunde, nicht NovaFlow",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "email"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "common.schema.json#/$defs/textKurz"
+        },
+        "email": {
+          "$ref": "common.schema.json#/$defs/email"
+        },
+        "antwort_an": {
+          "$ref": "common.schema.json#/$defs/email"
+        }
+      }
+    },
+    "adapter": {
+      "description": "Versandweg im Live-Betrieb",
+      "enum": [
+        "graph",
+        "smtp"
+      ]
+    },
+    "modus": {
+      "description": "test = alle Mails an test_empfaenger",
+      "enum": [
+        "test",
+        "live"
+      ]
+    },
+    "test_empfaenger": {
+      "$ref": "common.schema.json#/$defs/email"
+    },
+    "erinnerungen_tage_vorher": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 5,
+      "items": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 30
+      }
+    },
+    "kampagne": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "etappe_groesse",
+        "etappe_abstand_minuten",
+        "versandfenster"
+      ],
+      "properties": {
+        "etappe_groesse": {
+          "description": "Mails pro Etappe",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "etappe_abstand_minuten": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 1440
+        },
+        "versandfenster": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "von",
+            "bis"
+          ],
+          "properties": {
+            "von": {
+              "$ref": "common.schema.json#/$defs/uhrzeit"
+            },
+            "bis": {
+              "$ref": "common.schema.json#/$defs/uhrzeit"
+            }
+          }
+        }
+      }
+    },
+    "nachfass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "abstaende_tage"
+      ],
+      "properties": {
+        "abstaende_tage": {
+          "description": "Ein Eintrag je Nachfass-Mail: Tage nach der vorherigen Mail (leer = kein Nachfass)",
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 90
+          }
+        }
+      }
+    }
+  }
+}

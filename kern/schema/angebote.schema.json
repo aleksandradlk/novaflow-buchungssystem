@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "angebote.schema.json",
+  "title": "angebote.json – Angebote/Pakete (Startwerte)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "angebote"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "angebote": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "name",
+          "beschreibung",
+          "preis_text",
+          "termintyp",
+          "aktiv",
+          "sortierung"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "common.schema.json#/$defs/code"
+          },
+          "name": {
+            "$ref": "common.schema.json#/$defs/textKurz"
+          },
+          "beschreibung": {
+            "$ref": "common.schema.json#/$defs/textLang"
+          },
+          "preis_text": {
+            "description": "Reine Preis-Anzeige, keine Berechnung",
+            "$ref": "common.schema.json#/$defs/textKurz"
+          },
+          "termintyp": {
+            "description": "Code eines Termintyps aus termine.json",
+            "$ref": "common.schema.json#/$defs/code"
+          },
+          "ressource": {
+            "description": "Optional: belegt eine Einheit dieser Ressource aus termine.json",
+            "$ref": "common.schema.json#/$defs/code"
+          },
+          "folgetermin": {
+            "description": "Berechtigt zum Folgetermin (Modul folgetermin)",
+            "type": "boolean"
+          },
+          "aktiv": {
+            "type": "boolean"
+          },
+          "sortierung": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "zusatzoptionen": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "code",
+                "name"
+              ],
+              "properties": {
+                "code": {
+                  "$ref": "common.schema.json#/$defs/code"
+                },
+                "name": {
+                  "$ref": "common.schema.json#/$defs/textKurz"
+                },
+                "beschreibung": {
+                  "$ref": "common.schema.json#/$defs/textLang"
+                },
+                "preis_text": {
+                  "$ref": "common.schema.json#/$defs/textKurz"
+                },
+                "ressource": {
+                  "$ref": "common.schema.json#/$defs/code"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
