@@ -81,6 +81,11 @@ const cases = [
   ['Logo-Datei fehlt', (c) => { c.branding.logo = 'fehlt.svg'; }, /Logo-Datei/],
   ['Schrift ohne lokale Dateien', (c) => { c.branding.schrift.familie = 'Fancy Font'; }, /lokal/],
   ['zu wenig Kontrast', (c) => { c.branding.farben.text = '#bbbbbb'; }, /Kontrast/],
+  ['Mail-Text mit unbekanntem Schlüssel', (c) => { c.mails.du.bestaetigung_inhlat = 'x'; c.mails.sie.bestaetigung_inhlat = 'x'; }, /unbekannter Text „bestaetigung_inhlat“/],
+  ['Mail-Text mit Tippfehler im Platzhalter', (c) => { c.mails.sie.signatur = 'Ihr {{betreib}}'; }, /unbekannte Platzhalter \{\{betreib\}\}/],
+  ['Status-Mail für unbekannten Status', (c) => { c.mails.du.status_weg_inhalt = 'x'; c.mails.sie.status_weg_inhalt = 'x'; }, /Status „weg“ gibt es nicht/],
+  ['Mail-Texte du/Sie unvollständig', (c) => { delete c.mails.du.signatur; }, /fehlt in der du-Variante/],
+  ['Upload-Grenze überschritten', (c) => { c.kunde.formular.fotos.max_anzahl = 20; c.kunde.formular.fotos.max_mb = 25; }, /Upload-Grenze/],
 ];
 
 for (const [name, mutator, expected] of cases) {

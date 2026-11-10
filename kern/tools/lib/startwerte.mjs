@@ -2,7 +2,7 @@
 // backend command "nf-startwerte" imports (see kern/pb_hooks/nf/startwerte.js).
 
 export function buildStartwerte(config) {
-  const { kunde: K, angebote, termine: T, status, nachrichten: N, rechtliches, texte, branding } = config;
+  const { kunde: K, angebote, termine: T, status, nachrichten: N, rechtliches, texte, mails, branding } = config;
 
   const einstellungen = {
     buchbar_ab: T.zeitraum.buchbar_ab,
@@ -29,6 +29,8 @@ export function buildStartwerte(config) {
       domain: K.domain,
       zeitzone: K.zeitzone,
       logo: branding.logo,
+      farbe: branding.farben.primaer,
+      auf_farbe: branding.farben.auf_primaer,
     },
     module: K.module,
     formular: K.formular,
@@ -40,6 +42,7 @@ export function buildStartwerte(config) {
       nachfass: N.nachfass,
     },
     rechtliches,
+    mailvorlagen: { du: mails.du, sie: mails.sie },
   };
 
   const angeboteListe = angebote.angebote.map((a) => ({

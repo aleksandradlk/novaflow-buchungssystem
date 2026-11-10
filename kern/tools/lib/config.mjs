@@ -4,10 +4,15 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { SCHEMA_DIR, customerDir } from './paths.mjs';
 import { CONTRAST_PAIRS, contrastRatio } from './branding.mjs';
+
+const require = createRequire(import.meta.url);
+const mailvorlagen = require('../../pb_hooks/nf/mailvorlagen.js');
+const MAIL_STANDARD = require('../../pb_hooks/nf/mail_standard.js');
 
 export const CONFIG_FILES = [
   { key: 'kunde', file: 'kunde.json', schema: 'kunde.schema.json' },
@@ -17,6 +22,7 @@ export const CONFIG_FILES = [
   { key: 'nachrichten', file: 'nachrichten.json', schema: 'nachrichten.schema.json' },
   { key: 'rechtliches', file: 'rechtliches.json', schema: 'rechtliches.schema.json' },
   { key: 'texte', file: 'texte/seiten.json', schema: 'texte.schema.json' },
+  { key: 'mails', file: 'texte/mails.json', schema: 'mails.schema.json' },
   { key: 'branding', file: 'branding/branding.json', schema: 'branding.schema.json' },
 ];
 
@@ -246,6 +252,26 @@ function crossErrors(c, { dir, folderName }) {
   const sieKeys = Object.keys(c.texte.sie).sort();
   for (const k of duKeys.filter((k) => !sieKeys.includes(k))) err('texte/seiten.json', `Text „${k}“ fehlt in der Sie-Variante`);
   for (const k of sieKeys.filter((k) => !duKeys.includes(k))) err('texte/seiten.json', `Text „${k}“ fehlt in der du-Variante`);
+
+  // texte/mails.json
+  const mfile = 'texte/mails.json';
+  const statusCodes = status.map((x) => x.code);
+  const mDu = Object.keys(c.mails.du).sort();
+  const mSie = Object.keys(c.mails.sie).sort();
+  for (const k of mDu.filter((k) => !mSie.includes(k))) err(mfile, `Text „${k}“ fehlt in der Sie-Variante`);
+  for (const k of mSie.filter((k) => !mDu.includes(k))) err(mfile, `Text „${k}“ fehlt in der du-Variante`);
+  for (const variante of ['du', 'sie']) {
+    for (const [k, v] of Object.entries(c.mails[variante])) {
+      const statusText = k.match(/^status_([a-z][a-z0-9_]*)_(betreff|inhalt)$/);
+      if (statusText) {
+        if (!statusCodes.includes(statusText[1])) err(mfile, `„${k}“: Status „${statusText[1]}“ gibt es nicht in status.json`);
+      } else if (!(k in MAIL_STANDARD[variante])) {
+        err(mfile, `unbekannter Text „${k}“ (erlaubt: ${Object.keys(MAIL_STANDARD[variante]).join(', ')}, status_<code>_betreff/_inhalt)`);
+      }
+      const unbekannt = mailvorlagen.unbekanntePlatzhalter(v);
+      if (unbekannt.length) err(mfile, `„${k}“ (${variante}): unbekannte Platzhalter ${unbekannt.map((p) => `{{${p}}}`).join(', ')}`);
+    }
+  }
 
   // branding/branding.json
   const bfile = 'branding/branding.json';

@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../kern/schema/mails.schema.json",
+  "du": {
+    "signatur": "Viele Grüße\nDein Team vom {{betrieb}}",
+    "status_fertig_betreff": "Fertig zur Abholung",
+    "status_fertig_inhalt": "gute Nachricht: Dein Auftrag ist fertig. Du kannst ihn zu unseren Öffnungszeiten abholen."
+  },
+  "sie": {
+    "signatur": "Mit freundlichen Grüßen\nIhr Team vom {{betrieb}}",
+    "status_fertig_betreff": "Fertig zur Abholung",
+    "status_fertig_inhalt": "gute Nachricht: Ihr Auftrag ist fertig. Sie können ihn zu unseren Öffnungszeiten abholen."
+  }
+}
