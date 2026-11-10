@@ -4,7 +4,12 @@
 
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { require, slot, startInstanz, testKonfiguration } from './hilfen.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import AdmZip from 'adm-zip';
+import { require, slot, startInstanz, testKonfiguration, warteAuf } from './hilfen.mjs';
+import { csvLesen } from '../../web/uebersicht/tabelle.js';
 
 let playwright = null;
 try {
@@ -15,7 +20,11 @@ try {
 const ohneBrowser = playwright ? false : 'Playwright ist nicht installiert – Browser-Tests übersprungen.';
 
 const FIRMA = testKonfiguration().kunde.firma;
+// The backend allows at most 5 code logins per account within 3 minutes (brute-force protection),
+// so the tests are spread over several owner accounts.
 const INHABER = { email: 'inhaber@test.example', passwort: 'inhaber-pw-123', name: 'Ina Inhaber' };
+const INHABER_B = { email: 'inhaber-b@test.example', passwort: 'inhaber-pw-123', name: 'Ina B' };
+const INHABER_C = { email: 'inhaber-c@test.example', passwort: 'inhaber-pw-123', name: 'Ina C' };
 const MITARBEITER = { email: 'ma@test.example', passwort: 'mitarbeiter-pw-1', name: 'Max Mitarbeiter' };
 const ADRESSEN = [
   ['Zweigweg 2', '80331', 'München', '08:00', 'Erika'],
@@ -43,12 +52,18 @@ async function angemeldet(wer, { merken = false } = {}) {
   await page.getByLabel('E-Mail').fill(wer.email);
   await page.getByLabel('Passwort').fill(wer.passwort);
   if (merken) await page.getByLabel(/angemeldet bleiben/).check();
+  const vorher = new Set((await admin('nachrichten', `art = "anmeldecode" && empfaenger = "${wer.email}"`)).map((x) => x.id));
   await page.getByRole('button', { name: 'Weiter' }).click();
   await page.getByLabel('Code (6 Ziffern)').waitFor();
-  const [n] = await admin('nachrichten', `art = "anmeldecode" && empfaenger = "${wer.email}"`);
+  // the code is created in the background: wait for the new one (not an older login's)
+  const n = await warteAuf(async () => (await admin('nachrichten', `art = "anmeldecode" && empfaenger = "${wer.email}"`)).find((x) => !vorher.has(x.id)), { text: 'neuer Anmeldecode' });
   await page.getByLabel('Code (6 Ziffern)').fill(await I.anmeldecode(n.schluessel.split(':')[1]));
   await page.getByRole('button', { name: 'Anmelden' }).click();
-  await page.getByRole('navigation', { name: 'Hauptnavigation' }).waitFor();
+  try {
+    await page.getByRole('navigation', { name: 'Hauptnavigation' }).waitFor({ timeout: 10000 });
+  } catch (err) {
+    throw new Error(`Anmeldung hängt. Seite zeigt: ${(await page.locator('main').innerText()).slice(0, 300)} | ${fehler.join(' ')}`);
+  }
   return { ctx, page, fehler };
 }
 
@@ -67,7 +82,7 @@ describe('Übersicht im Handy-Browser', { skip: ohneBrowser }, () => {
     browser = await playwright.chromium.launch();
     I = await startInstanz({ seiten: true });
     await I.api('PATCH', '/api/settings', { body: { rateLimits: { enabled: false } }, token: I.adminToken });
-    for (const [wer, rolle] of [[INHABER, 'inhaber'], [MITARBEITER, 'mitarbeiter']]) {
+    for (const [wer, rolle] of [[INHABER, 'inhaber'], [INHABER_B, 'inhaber'], [INHABER_C, 'inhaber'], [MITARBEITER, 'mitarbeiter']]) {
       const r = await I.api('POST', '/api/collections/users/records', {
         token: I.adminToken, body: { email: wer.email, password: wer.passwort, passwordConfirm: wer.passwort, rolle, name: wer.name },
       });
@@ -179,7 +194,7 @@ describe('Übersicht im Handy-Browser', { skip: ohneBrowser }, () => {
   });
 
   test('Touren: Link öffnet Google Maps mit Start beim Betrieb und Stopps nach PLZ', async () => {
-    const { ctx, page } = await angemeldet(INHABER);
+    const { ctx, page } = await angemeldet(INHABER_B);
     await oeffnen(page, '#/touren/2030-01-07', '.stopps');
     const stopps = await page.locator('.stopps > li > strong').allInnerTexts();
     assert.deepEqual(stopps, ['Dorfstraße 1, 01067 Dresden', 'Am Bach 5, 10115 Berlin', 'Zweigweg 2, 80331 München']);
@@ -198,7 +213,7 @@ describe('Übersicht im Handy-Browser', { skip: ohneBrowser }, () => {
   });
 
   test('Kontakte: zeigt nur Kontakte ohne Buchung im Zeitraum', async () => {
-    const { ctx, page } = await angemeldet(INHABER);
+    const { ctx, page } = await angemeldet(INHABER_B);
     await oeffnen(page, '#/kontakte', '.kontakt');
     const text = await page.locator('.kontakte').innerText();
     assert.match(text, /Ohne Buchung/);
@@ -258,6 +273,81 @@ describe('Übersicht im Handy-Browser', { skip: ohneBrowser }, () => {
       else await page.getByText(/maximale Anzahl an Mitarbeiter-Zugängen \(3\)/).waitFor();
     }
     assert.match(await page.locator('.verwaltung-inhalt').innerText(), /3 von 3 Mitarbeiter-Zugängen belegt/);
+    await ctx.close();
+  });
+
+  test('Import: 10 Fake-Kontakte aus CSV über die Oberfläche, plus Excel-Datei', async () => {
+    const { ctx, page } = await angemeldet(INHABER_B);
+    page.on('dialog', (d) => d.accept());
+    await oeffnen(page, '#/verwaltung/import', '#imp-datei');
+    const kopf = 'Vorname;Nachname;E-Mail;Telefon;Straße;PLZ;Ort;Newsletter;Gerät / Modell';
+    const zeilen = Array.from({ length: 10 }, (_, i) => `Fake${i};Kontakt;import${i}@example.com;0123 ${i};Weg ${i};${10000 + i};Ort;${i < 6 ? 'ja' : 'nein'};Modell ${i}`);
+    await page.setInputFiles('#imp-datei', { name: 'kunden.csv', mimeType: 'text/csv', buffer: Buffer.from(`﻿${[kopf, ...zeilen].join('\r\n')}\r\n`) });
+    await page.getByRole('heading', { name: 'Spalten zuordnen (10 Zeilen)' }).waitFor();
+    assert.equal(await page.locator('#imp-email').inputValue(), '2', 'E-Mail-Spalte erkannt');
+    assert.equal(await page.locator('#imp-zf_geraet').inputValue(), '8', 'Zusatzfeld erkannt');
+    await page.getByRole('button', { name: '10 Zeilen importieren' }).click();
+    await page.getByText('Bitte bestätigen, dass die Einwilligungen nachweisbar vorliegen.').waitFor();
+    await page.getByLabel(/Einwilligungen in der Datei liegen nachweisbar vor/).check();
+    await page.getByRole('button', { name: '10 Zeilen importieren' }).click();
+    await page.getByText('10 neu angelegt, 0 vorhandene Kontakte ergänzt, 0 übersprungen.').waitFor();
+    const k = await admin('kontakte', 'email ~ "import"');
+    assert.equal(k.length, 10);
+    assert.equal(k.filter((x) => x.einwilligung_email && x.einwilligung_email_quelle === 'import').length, 6);
+    assert.ok(k.every((x) => x.zusatzfelder.geraet && x.strasse && x.plz));
+
+    // Excel
+    const zip = new AdmZip();
+    zip.addFile('xl/sharedStrings.xml', Buffer.from('<sst><si><t>E-Mail</t></si><si><t>Vorname</t></si><si><t>Einwilligung</t></si></sst>'));
+    zip.addFile('xl/worksheets/sheet1.xml', Buffer.from('<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>excel@example.com</t></is></c><c r="B2" t="inlineStr"><is><t>Exel</t></is></c><c r="C2" t="inlineStr"><is><t>x</t></is></c></row></sheetData></worksheet>'));
+    await oeffnen(page, '#/verwaltung/import', '#imp-datei');
+    await page.setInputFiles('#imp-datei', { name: 'kunden.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: zip.toBuffer() });
+    await page.getByLabel(/Einwilligungen in der Datei liegen nachweisbar vor/).check();
+    await page.getByRole('button', { name: '1 Zeilen importieren' }).click();
+    await page.getByText('1 neu angelegt', { exact: false }).waitFor();
+    const [x] = await admin('kontakte', 'email = "excel@example.com"');
+    assert.deepEqual([x.vorname, x.einwilligung_email], ['Exel', true]);
+    await ctx.close();
+  });
+
+  test('Kampagne: Start durch den Inhaber, Mails werden für die Etappen geplant', async () => {
+    const { ctx, page } = await angemeldet(INHABER_C);
+    page.on('dialog', (d) => d.accept());
+    await oeffnen(page, '#/verwaltung/kampagne', '.auswahl');
+    assert.match(await page.locator('.verwaltung-inhalt').innerText(), /Testmodus: Alle Mails gehen an/);
+    const moeglich = await page.locator('dt:has-text("Mögliche Empfänger") + dd').innerText();
+    assert.equal(moeglich, '7', '6 + 1 importierte Kontakte mit Einwilligung');
+    await page.getByRole('button', { name: 'Kampagne jetzt starten' }).click();
+    await page.getByText('7 Mails geplant.', { exact: false }).waitFor();
+    const geplant = await admin('nachrichten', 'art = "kampagne" && status = "geplant"');
+    assert.equal(geplant.length, 7);
+    await ctx.close();
+  });
+
+  test('Export: ZIP mit allen Bereichen, vollständig; Fotos auf Wunsch', async () => {
+    const { ctx, page } = await angemeldet(INHABER_C);
+    await oeffnen(page, '#/verwaltung/export', '#exp-fotos');
+    await page.getByLabel(/Fotos einschließen/).check();
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Alle Daten exportieren' }).click(),
+    ]);
+    assert.match(download.suggestedFilename(), /^export-_beispiel-\d{4}-\d{2}-\d{2}\.zip$/);
+    const datei = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'nf-export-')), 'export.zip');
+    await download.saveAs(datei);
+    const zip = new AdmZip(datei);
+    const namen = zip.getEntries().map((e) => e.entryName);
+    for (const c of ['einstellungen', 'angebote', 'terminregeln', 'sperrtage', 'kontakte', 'buchungen', 'status_log', 'nachrichten', 'users']) {
+      assert.ok(namen.includes(`${c}.csv`), `${c}.csv fehlt`);
+      const csv = csvLesen(zip.readAsText(`${c}.csv`));
+      const r = await I.api('GET', `/api/collections/${c}/records?perPage=1${c === 'nachrichten' ? `&filter=${encodeURIComponent('art != "anmeldecode"')}` : ''}`, { token: I.adminToken });
+      assert.equal(csv.length - (r.json.totalItems ? 1 : 0), r.json.totalItems, `${c}: alle Datensätze`);
+    }
+    const kopf = csvLesen(zip.readAsText('kontakte.csv'))[0];
+    for (const feld of ['vorname', 'email', 'einwilligung_email', 'einwilligung_email_am', 'einwilligung_email_quelle']) assert.ok(kopf.includes(feld), feld);
+    assert.ok(!kopf.includes('token'), 'Zugangs-Tokens werden nicht exportiert');
+    assert.ok(namen.some((n) => n.startsWith(`fotos/${buchungen.Erika}/`)), 'Foto im Export');
+    fs.rmSync(path.dirname(datei), { recursive: true, force: true });
     await ctx.close();
   });
 });

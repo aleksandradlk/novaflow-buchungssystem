@@ -15,7 +15,11 @@ import { buildCredentials, buildWorkflows } from '../lib/n8n.mjs';
 const N8N_DIR = n8nVerzeichnis();
 const SECRET = 'test-geheimnis-e2e-1234567890';
 const KUNDE = '_beispiel';
-const BEISPIEL = testKonfiguration();
+// whole-day sending window and small stages so the campaign test runs at any time of day
+const ANPASSEN = (c) => {
+  c.nachrichten.kampagne = { etappe_groesse: 4, etappe_abstand_minuten: 30, versandfenster: { von: '00:00', bis: '23:59' } };
+};
+const BEISPIEL = testKonfiguration(ANPASSEN);
 const TEST_EMPFAENGER = BEISPIEL.nachrichten.test_empfaenger;
 const ABSENDER = BEISPIEL.nachrichten.absender;
 const BETRIEB = BEISPIEL.kunde.name;
@@ -70,6 +74,7 @@ describe('Mails mit echtem n8n', { skip: N8N_DIR ? false : 'NF_TEST_N8N_DIR nich
 
     const n8nPort = await freierPort();
     I = await startInstanz({
+      mutate: ANPASSEN,
       env: {
         NF_WEBHOOK_URL: `http://127.0.0.1:${n8nPort}/webhook/${KUNDE}`,
         NF_WEBHOOK_SECRET: SECRET,
@@ -79,7 +84,7 @@ describe('Mails mit echtem n8n', { skip: N8N_DIR ? false : 'NF_TEST_N8N_DIR nich
     });
     await I.api('PATCH', '/api/settings', { body: { rateLimits: { enabled: false } }, token: I.adminToken });
 
-    const config = testKonfiguration();
+    const config = testKonfiguration(ANPASSEN);
     const workflows = buildWorkflows({ config, pbUrl: I.base, graphApiUrl: graph.url, telegramChatId: '42' });
     const credentials = buildCredentials({
       config,
@@ -251,5 +256,53 @@ describe('Mails mit echtem n8n', { skip: N8N_DIR ? false : 'NF_TEST_N8N_DIR nich
     assert.equal((await n8nWebhook('nachholen-jetzt')).status, 200);
     await warteAuf(async () => (await nachrichten('empfaenger = "stoerung@example.com"'))[0].status === 'gesendet', { text: 'nachgeholt' });
     assert.equal(postfach.mails.length, vorher + 1);
+  });
+
+  test('Kampagne im Testmodus in Etappen über n8n; Abgemeldete bekommen nichts; Nachfass, Einladung, Löschung', async () => {
+    const zeilen = Array.from({ length: 10 }, (_, i) => ({ nr: i + 2, vorname: `Kampagne${i}`, nachname: 'Test', email: `kampagne${i}@example.com`, einwilligung_email: i < 6 }));
+    const imp = await I.api('POST', '/api/nf-team/import', { body: { zeilen }, token: I.adminToken });
+    assert.equal(imp.json.neu, 10, imp.text);
+    const [abgemeldet] = (await I.api('GET', `/api/collections/kontakte/records?filter=${encodeURIComponent('email = "kampagne0@example.com"')}`, { token: I.adminToken })).json.items;
+    await I.api('POST', `/api/nf/abmelden?t=${abgemeldet.token}`);
+    // earlier tests left contacts with consent? only the imported ones have consent here
+    const vorher = postfach.mails.length;
+
+    assert.equal((await n8nWebhook('kampagne-start-jetzt')).status, 200);
+    await warteAuf(async () => (await nachrichten('art = "kampagne"')).length === 5, { text: '5 Kampagnen-Mails geplant' });
+    assert.equal(postfach.mails.length, vorher, 'Start allein verschickt nichts');
+
+    assert.equal((await n8nWebhook('kampagne-etappen-jetzt')).status, 200);
+    await warteAuf(() => postfach.mails.length === vorher + 4, { text: 'Etappe 1: 4 Mails' });
+    assert.equal((await n8nWebhook('kampagne-etappen-jetzt')).status, 200);
+    await warteAuf(() => postfach.mails.length === vorher + 5, { text: 'Etappe 2: 1 Mail' });
+    await n8nWebhook('kampagne-etappen-jetzt');
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.equal(postfach.mails.length, vorher + 5, 'keine weiteren');
+
+    const kampagne = postfach.mails.slice(vorher);
+    for (const m of kampagne) {
+      assert.deepEqual(m.an, [TEST_EMPFAENGER]);
+      assert.match(m.betreff, /^\[TEST → kampagne[1-5]@example\.com\] Jetzt Termin für die neue Saison sichern$/);
+      assert.match(m.inhalt, /https:\/\/buchung\.test\/\?t=[A-Za-z0-9]{40}/);
+      assert.match(m.inhalt, /Abmelden: https:\/\/buchung\.test\/abmelden\/\?t=/);
+    }
+    assert.ok(!postfach.mails.some((m) => m.betreff.includes('kampagne0@')), 'Abgemeldete bekommt nichts');
+
+    // follow-up: in this test instance waiting times are 0 (NF_NACHHOLEN_SOFORT)
+    assert.equal((await n8nWebhook('nachfass-jetzt')).status, 200);
+    await warteAuf(async () => (await nachrichten('art = "nachfass"')).length === 5, { text: 'Nachfass geplant' });
+    await n8nWebhook('kampagne-etappen-jetzt');
+    await n8nWebhook('kampagne-etappen-jetzt');
+    await warteAuf(() => postfach.mails.filter((m) => /Erinnerung: Jetzt Termin sichern/.test(m.betreff)).length === 5, { text: 'Nachfass-Mails' });
+
+    // follow-up invitation (period moved to today) and deletion run
+    const z = zeitIntl('Europe/Berlin');
+    const heute = z.toLocal(Date.now()).datum;
+    await einstellungen({ folgetermin_ab: heute, folgetermin_bis: '2030-05-31' });
+    assert.equal((await n8nWebhook('folgetermin-einladung-jetzt')).status, 200);
+    await warteAuf(async () => (await nachrichten('art = "folgetermin_einladung"')).length > 0, { text: 'Einladung geplant' });
+    await n8nWebhook('kampagne-etappen-jetzt');
+    await warteAuf(() => postfach.mails.some((m) => /Jetzt Folgetermin buchen$/.test(m.betreff)), { text: 'Einladungs-Mail' });
+    assert.equal((await n8nWebhook('loeschung-jetzt')).status, 200);
   });
 });

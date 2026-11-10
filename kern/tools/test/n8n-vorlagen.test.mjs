@@ -3,15 +3,35 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { testKonfiguration } from './hilfen.mjs';
-import { EREIGNISSE, buildCredentials, buildWorkflows, kennungen } from '../lib/n8n.mjs';
+import { EREIGNISSE, buildCredentials, buildWorkflows, etappenCron, kennungen } from '../lib/n8n.mjs';
 
 const config = testKonfiguration();
 const wfs = buildWorkflows({ config, pbUrl: 'http://127.0.0.1:8090/', telegramChatId: '42' });
 const nachName = Object.fromEntries(wfs.map((w) => [w.name.split(' · ')[1], w]));
 
-test('sieben Workflows: Mail senden, vier Ereignisse (inkl. Anmeldecode), Erinnerungen, Nachholen – alle aktiv', () => {
-  assert.deepEqual(Object.keys(nachName).sort(), ['Mail senden', ...EREIGNISSE, 'erinnerungen', 'nachholen'].sort());
+test('alle Module: Mail senden, vier Ereignisse, sieben zeitgesteuerte – alle aktiv', () => {
+  assert.deepEqual(Object.keys(nachName).sort(), ['Mail senden', ...EREIGNISSE, 'erinnerungen', 'nachholen',
+    'kampagne-etappen', 'kampagne-start', 'nachfass', 'folgetermin-einladung', 'loeschung'].sort());
   assert.ok(wfs.every((w) => w.active === true));
+});
+
+test('nur Workflows der gebuchten Module', () => {
+  const ohne = testKonfiguration((c) => {
+    Object.assign(c.kunde.module, { kampagne: false, folgetermin: false, loeschung: false });
+    c.angebote.angebote.forEach((a) => { a.folgetermin = false; });
+    delete c.termine.folgetermin;
+  });
+  const namen = buildWorkflows({ config: ohne, pbUrl: 'http://x' }).map((w) => w.name.split(' · ')[1]);
+  assert.ok(!namen.some((n) => /kampagne|nachfass|folgetermin|loeschung/.test(n)), namen.join(', '));
+});
+
+test('Zeitpläne: Etappen im Abstand aus der Konfiguration, Kampagnen-Start nur von Hand', () => {
+  assert.equal(etappenCron(30), '*/30 * * * *');
+  assert.equal(etappenCron(120), '0 */2 * * *');
+  const etappen = nachName['kampagne-etappen'].nodes.find((n) => n.name === 'Zeitplan');
+  assert.equal(etappen.parameters.rule.interval[0].expression, etappenCron(config.nachrichten.kampagne.etappe_abstand_minuten));
+  assert.ok(!nachName['kampagne-start'].nodes.some((n) => n.name === 'Zeitplan'));
+  assert.ok(nachName['loeschung'].nodes.every((n) => n.type !== 'n8n-nodes-base.executeWorkflow'), 'Löschung verschickt nichts');
 });
 
 test('alle Platzhalter gefüllt, keine Secrets in den Workflows', () => {
@@ -28,7 +48,7 @@ test('IDs sind stabil und eindeutig; alle Aufrufe zeigen auf „Mail senden“',
   const ziel = nachName['Mail senden'].id;
   for (const w of wfs.filter((x) => x !== nachName['Mail senden'])) {
     const aufruf = w.nodes.find((n) => n.type === 'n8n-nodes-base.executeWorkflow');
-    assert.equal(aufruf.parameters.workflowId.value, ziel, w.name);
+    if (aufruf) assert.equal(aufruf.parameters.workflowId.value, ziel, w.name);
   }
 });
 
