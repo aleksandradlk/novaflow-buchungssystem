@@ -50,14 +50,18 @@ async function download(url) {
   return Buffer.from(await res.arrayBuffer());
 }
 
-/** Returns the path to the verified binary, downloading it if needed. */
-export async function ensurePocketBase({ log = console.log } = {}) {
+/**
+ * Returns the path to the verified binary, downloading it if needed.
+ * @param {object} [o]
+ * @param {string} [o.binDir]  cache folder (default .dev/bin; on the server /opt/novaflow/bin)
+ */
+export async function ensurePocketBase({ log = console.log, binDir = path.join(DEV_DIR, 'bin') } = {}) {
   const pin = readVersionPin();
   const key = platformKey();
   const expected = pin.sha256[key];
   if (!expected) throw new Error(`Keine Prüfsumme für ${key} in kern/pocketbase-version.json.`);
 
-  const dir = path.join(DEV_DIR, 'bin', `pocketbase-${pin.version}-${key}`);
+  const dir = path.join(binDir, `pocketbase-${pin.version}-${key}`);
   const exe = path.join(dir, binaryName(key));
   if (fs.existsSync(exe) && installedVersion(exe) === pin.version) return exe;
 
