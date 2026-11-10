@@ -1,0 +1,43 @@
+# One booking-system instance (template unit: novaflow@<instanz>.service).
+# Installed by deploy/server-einrichten.sh; instances are enabled by deploy/neuer-kunde.sh.
+[Unit]
+Description=NovaFlow Instanz %i
+After=network.target
+OnFailure=novaflow-melden@%i.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=novaflow
+Group=novaflow
+EnvironmentFile=/etc/novaflow/%i.env
+ExecStart=/opt/novaflow/vorlage/deploy/starten.sh %i
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=4096
+
+# hardening: the instance may only write its own data folder
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/srv/novaflow/%i/pb_data
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

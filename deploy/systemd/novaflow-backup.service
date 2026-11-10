@@ -1,0 +1,10 @@
+# Nightly backup of all instances (started by novaflow-backup.timer).
+[Unit]
+Description=NovaFlow Backup aller Instanzen
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/novaflow/vorlage/deploy/backup.sh --alle
+Nice=10
+IOSchedulingClass=idle

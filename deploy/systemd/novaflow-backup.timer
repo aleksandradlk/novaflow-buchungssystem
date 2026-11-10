@@ -1,0 +1,11 @@
+# Daily at 02:30 (before the deletion run at 03:00), catches up after downtime.
+[Unit]
+Description=NovaFlow Backup täglich
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target
