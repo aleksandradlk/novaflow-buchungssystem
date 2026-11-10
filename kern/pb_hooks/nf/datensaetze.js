@@ -1,6 +1,7 @@
 // Record hooks: booking status changes, staff roles and limits.
 
 const basis = require(`${__hooks}/nf/basis.js`);
+const nachrichten = require(`${__hooks}/nf/nachrichten.js`);
 
 const fehler = basis.fehler;
 
@@ -18,7 +19,7 @@ function rolle(e) {
  * Update of a booking through the API (overview or admin).
  * - mitarbeiter may change the status only
  * - status must exist in the status list; "abschluss" sets abgeschlossen_am
- * - after saving: status_log entry + webhook "status" (only for statuses with mail flag)
+ * - after saving: status_log entry + status mail via outbox (only for statuses with mail flag)
  */
 function buchungAktualisieren(e) {
   const cfg = basis.einstellungen(e.app);
@@ -52,24 +53,12 @@ function buchungAktualisieren(e) {
   log.set("mail_gesendet", false);
   e.app.save(log);
 
-  if (st.mail && cfg.module.status && e.record.getString("abgesagt_am") === "") {
-    const kontakt = e.app.findRecordById("kontakte", e.record.getString("kontakt"));
-    basis.webhook("status", {
-      art: "status",
-      kunde: cfg.betrieb.kennung,
-      ansprache: cfg.ansprache,
-      buchung_id: e.record.id,
-      status_log_id: log.id,
+  if (st.mail && e.record.getString("abgesagt_am") === "") {
+    const mail = nachrichten.erstellen(e.app, cfg, "status", e.record, {
+      schluessel: "status:" + log.id,
       status: { code: st.code, name: st.name },
-      verwalten_token: e.record.getString("token_verwalten"),
-      kontakt: {
-        id: kontakt.id,
-        anrede: kontakt.getString("anrede"),
-        vorname: kontakt.getString("vorname"),
-        nachname: kontakt.getString("nachname"),
-        email: kontakt.getString("email"),
-      },
     });
+    nachrichten.melden(cfg, mail);
   }
 }
 

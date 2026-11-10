@@ -3,6 +3,7 @@
 const basis = require(`${__hooks}/nf/basis.js`);
 const slots = require(`${__hooks}/nf/slots.js`);
 const kap = require(`${__hooks}/nf/kapazitaet.js`);
+const nachrichten = require(`${__hooks}/nf/nachrichten.js`);
 
 const fehler = basis.fehler;
 const MAX_TAGE_SLOTS = 62;
@@ -85,26 +86,6 @@ function buchungDto(app, cfg, b) {
     folgetermin_zu_buchung: b.getString("eltern_buchung") !== "",
     kontakt: { vorname: kontakt.getString("vorname"), nachname: kontakt.getString("nachname") },
   };
-}
-
-/** Webhook payload – everything the automation needs for the mail. */
-function payload(app, cfg, art, b, extra) {
-  const kontakt = app.findRecordById("kontakte", b.getString("kontakt"));
-  return Object.assign({
-    art: art,
-    kunde: cfg.betrieb.kennung,
-    ansprache: cfg.ansprache,
-    buchung_id: b.id,
-    buchung: buchungDto(app, cfg, b),
-    verwalten_token: b.getString("token_verwalten"),
-    kontakt: {
-      id: kontakt.id,
-      anrede: kontakt.getString("anrede"),
-      vorname: kontakt.getString("vorname"),
-      nachname: kontakt.getString("nachname"),
-      email: kontakt.getString("email"),
-    },
-  }, extra || {});
 }
 
 function aenderbar(b) {
@@ -431,7 +412,7 @@ function buchen(e) {
   const t = basis.token(e) || (typeof d.t === "string" && /^[A-Za-z0-9]{32,64}$/.test(d.t) ? d.t : "");
   const start = basis.startStatus(cfg);
 
-  const b = transaktion(function (tx) {
+  let b = transaktion(function (tx) {
     const ctx = kap.kontextFuerStart(tx, cfg, typ, startMs, ress, "");
     const slot = slots.freiAm(ctx, startMs);
     if (!slot) throw fehler(409, TEXT.slotUngueltig);
@@ -452,10 +433,12 @@ function buchen(e) {
     rec.set("bemerkung", daten.bemerkung);
     if (dateien.length > 0) rec.set("fotos", dateien);
     tx.save(rec);
-    return rec;
+    // the confirmation is stored in the same transaction (outbox) – sent after commit
+    return { rec: rec, mail: nachrichten.erstellen(tx, cfg, "bestaetigung", rec) };
   });
 
-  basis.webhook("neue-buchung", payload($app, cfg, "neue-buchung", b));
+  nachrichten.melden(cfg, b.mail);
+  b = b.rec;
   return e.json(201, {
     ok: true,
     buchung: buchungDto($app, cfg, b),
@@ -486,11 +469,10 @@ function verwaltenAendern(e) {
 
   if (d.aktion === "verschieben") {
     const startMs = startAus(d.start);
-    let altStart = "";
-    const b = transaktion(function (tx) {
+    const r = transaktion(function (tx) {
       const rec = findeBuchung(tx, t);
       if (!aenderbar(rec)) throw fehler(409, TEXT.nichtAenderbar);
-      altStart = iso(rec.getString("termin_start"));
+      const altStart = rec.getString("termin_start");
       const typ = basis.termintyp(cfg, rec.getString("termintyp"));
       if (!typ) throw fehler(409, TEXT.nichtAenderbar);
       const ctx = kap.kontextFuerStart(tx, cfg, typ, startMs, basis.json(rec, "ressourcen", []), rec.id);
@@ -500,14 +482,20 @@ function verwaltenAendern(e) {
       rec.set("termin_start", basis.pbDatum(startMs));
       rec.set("termin_ende", basis.pbDatum(startMs + typ.dauer_minuten * 60000));
       tx.save(rec);
-      return rec;
+      // every move is its own event (moving twice → two mails)
+      const mail = nachrichten.erstellen(tx, cfg, "verschoben", rec, {
+        schluessel: "verschoben:" + rec.id + ":" + Date.now(),
+        alter_start: altStart,
+      });
+      return { rec: rec, mail: mail };
     });
-    basis.webhook("verschoben-abgesagt", payload($app, cfg, "verschoben", b, { alter_start: altStart }));
-    return e.json(200, { ok: true, buchung: buchungDto($app, cfg, b) });
+    nachrichten.melden(cfg, r.mail);
+    return e.json(200, { ok: true, buchung: buchungDto($app, cfg, r.rec) });
   }
 
   if (d.aktion === "absagen") {
     const abgesagt = [];
+    const mails = [];
     transaktion(function (tx) {
       const rec = findeBuchung(tx, t);
       if (!aenderbar(rec)) throw fehler(409, TEXT.nichtAenderbar);
@@ -515,16 +503,16 @@ function verwaltenAendern(e) {
       rec.set("abgesagt_am", jetzt);
       tx.save(rec);
       abgesagt.push(rec);
+      mails.push(nachrichten.erstellen(tx, cfg, "abgesagt", rec));
       // a follow-up appointment makes no sense without its booking
       tx.findRecordsByFilter("buchungen", "eltern_buchung = {:id} && abgesagt_am = ''", "", 0, 0, { id: rec.id }).forEach(function (kind) {
         kind.set("abgesagt_am", jetzt);
         tx.save(kind);
         abgesagt.push(kind);
+        mails.push(nachrichten.erstellen(tx, cfg, "abgesagt", kind));
       });
     });
-    abgesagt.forEach(function (rec) {
-      basis.webhook("verschoben-abgesagt", payload($app, cfg, "abgesagt", rec));
-    });
+    mails.forEach(function (m) { nachrichten.melden(cfg, m); });
     return e.json(200, { ok: true, buchung: buchungDto($app, cfg, abgesagt[0]) });
   }
 
@@ -549,7 +537,7 @@ function folgeterminBuchen(e) {
   const typ = basis.termintyp(cfg, cfg.folgetermin_typ);
   const start = basis.startStatus(cfg);
 
-  const kind = transaktion(function (tx) {
+  const ergebnis = transaktion(function (tx) {
     const eltern = findeBuchung(tx, t);
     const info = folgeterminInfo(tx, cfg, eltern);
     if (!info.berechtigt || !typ) throw fehler(403, TEXT.folgeNicht);
@@ -572,10 +560,11 @@ function folgeterminBuchen(e) {
     rec.set("token_verwalten", basis.neuesToken());
     rec.set("eltern_buchung", eltern.id);
     tx.save(rec);
-    return rec;
+    return { rec: rec, mail: nachrichten.erstellen(tx, cfg, "folgetermin", rec) };
   });
 
-  basis.webhook("neue-buchung", payload($app, cfg, "folgetermin", kind));
+  nachrichten.melden(cfg, ergebnis.mail);
+  const kind = ergebnis.rec;
   return e.json(201, {
     ok: true,
     buchung: buchungDto($app, cfg, kind),

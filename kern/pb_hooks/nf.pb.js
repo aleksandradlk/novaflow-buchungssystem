@@ -67,6 +67,29 @@ routerAdd("POST", "/api/nf/abmelden", (e) => {
   return basis.sicher(e, () => require(`${__hooks}/nf/routen.js`).abmelden(e));
 });
 
+// ---------------------------------------------------------------- internal routes for the automation
+// Header X-NF-Secret required; blocked from outside by the web server (phase 7).
+
+routerAdd("POST", "/api/nf-intern/versand/start", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/nachrichten.js`).versandStart(e));
+});
+
+routerAdd("POST", "/api/nf-intern/versand/ergebnis", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/nachrichten.js`).versandErgebnis(e));
+});
+
+routerAdd("POST", "/api/nf-intern/erinnerungen", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/nachrichten.js`).erinnerungen(e));
+});
+
+routerAdd("GET", "/api/nf-intern/offen", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => require(`${__hooks}/nf/nachrichten.js`).offen(e));
+});
+
 // ---------------------------------------------------------------- record hooks
 onRecordUpdateRequest((e) => {
   require(`${__hooks}/nf/datensaetze.js`).buchungAktualisieren(e);

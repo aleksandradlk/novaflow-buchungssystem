@@ -83,6 +83,12 @@ function einstellungen(app) {
     formular: json(rec, "formular", {}),
     rollen: json(rec, "rollen", {}),
     rechtliches: json(rec, "rechtliches", {}),
+    mail_modus: rec.getString("mail_modus"),
+    mail_adapter: rec.getString("mail_adapter"),
+    test_empfaenger: rec.getString("test_empfaenger"),
+    absender: json(rec, "absender", {}),
+    nachrichten: json(rec, "nachrichten", {}),
+    mailvorlagen: json(rec, "mailvorlagen", { du: {}, sie: {} }),
   };
 }
 
