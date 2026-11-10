@@ -146,7 +146,8 @@ export async function startInstanz({ mutate, kundeDir = customerDir('_beispiel')
     return r.json.token;
   }
 
-  const adminToken = await login('_superusers', admin.email, admin.password);
+  // with the admin second factor switched on (betrieb.test.mjs) there is no plain password login
+  const adminToken = env.NF_SUPERUSER_2FA === '0' ? await login('_superusers', admin.email, admin.password) : null;
 
   /** Code of a requested login (read from the outbox like the mail would deliver it). */
   async function anmeldecode(otpId) {
@@ -172,6 +173,8 @@ export async function startInstanz({ mutate, kundeDir = customerDir('_beispiel')
   return {
     base,
     env,
+    admin,
+    dataDir,
     api,
     login,
     teamLogin,
