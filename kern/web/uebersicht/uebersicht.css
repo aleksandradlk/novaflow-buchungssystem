@@ -1,0 +1,358 @@
+/* Overview (staff area) – builds on gemeinsam/basis.css, mobile first. */
+
+.team .seite,
+.team .kopf {
+  max-width: 64rem;
+}
+
+.team-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+}
+
+.team-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  flex: 1;
+}
+
+.team-nav[hidden] {
+  display: none;
+}
+
+.team-nav ul {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+}
+
+.team-nav a {
+  display: inline-block;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.team-nav a[aria-current="page"] {
+  background: var(--color-primary, #333333);
+  color: var(--color-on-primary, #ffffff);
+}
+
+.team-nav .wer {
+  margin-left: auto;
+  font-size: 0.9rem;
+}
+
+.knopf.klein {
+  min-height: 2.5rem;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.95rem;
+}
+
+.karte-box {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.anmeldung {
+  max-width: 26rem;
+  margin: 1rem auto;
+}
+
+.werkzeug {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.werkzeug h1 {
+  margin: 0 0.5rem;
+}
+
+/* ---------------------------------------------------------------- week / day */
+
+.tag {
+  margin-top: 1.25rem;
+}
+
+.tag h2 {
+  font-size: 1.05rem;
+  margin-bottom: 0.5rem;
+}
+
+.tag.heute h2 a {
+  color: var(--color-primary, #333333);
+}
+
+.tag h2 .anzahl {
+  font-weight: normal;
+  font-size: 0.9rem;
+}
+
+.termine,
+.kontakte,
+.stopps,
+.liste,
+.verlauf {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.termin-zeile {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: 0.5rem;
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text, #1a1a1a);
+  text-decoration: none;
+}
+
+.termin-zeile:hover {
+  border-color: var(--color-primary, #333333);
+}
+
+.termin-zeile .zeit {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.termin-zeile.abgesagt .wer strong,
+.termin-zeile.abgesagt .zeit {
+  text-decoration: line-through;
+  color: #666666;
+}
+
+.chip {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-primary, #333333);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.chip-fertig {
+  background: var(--color-primary, #333333);
+  color: var(--color-on-primary, #ffffff);
+}
+
+.chip-abgesagt {
+  border-color: #b42318;
+  color: #b42318;
+}
+
+.leer {
+  color: #555555;
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------- details */
+
+.details section {
+  margin-top: 1.5rem;
+}
+
+.status-knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.status-knoepfe .knopf.haupt {
+  flex: none;
+}
+
+.mehrzeilig {
+  white-space: pre-wrap;
+}
+
+.fotos ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 0.5rem;
+}
+
+.fotos img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border, #dddddd);
+}
+
+/* ---------------------------------------------------------------- contacts / tours */
+
+.kontakt,
+.stopps li,
+.liste li {
+  padding: 0.75rem;
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: 0.5rem;
+  background: var(--color-surface, #ffffff);
+}
+
+.stopps {
+  list-style: decimal inside;
+}
+
+.routen {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.routen .knopf {
+  flex: none;
+}
+
+/* ---------------------------------------------------------------- administration */
+
+.reiter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border, #dddddd);
+}
+
+.reiter a {
+  padding: 0.5rem 0.75rem;
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 3px solid transparent;
+}
+
+.reiter a[aria-current="page"] {
+  border-bottom-color: var(--color-primary, #333333);
+}
+
+.stapel {
+  display: grid;
+  gap: 1rem;
+}
+
+.zeile2 {
+  display: grid;
+  gap: 0 0.75rem;
+}
+
+.regel {
+  border-top: 1px solid var(--color-border, #dddddd);
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.regel-felder {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0 0.75rem;
+}
+
+.option-zeile {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.option-zeile input {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #767676;
+  border-radius: 0.5rem;
+  font: inherit;
+}
+
+.feld-titel {
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+
+.liste li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.knopf-gruppe {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+details summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-top: 0.75rem;
+}
+
+.feld input[type="number"],
+.feld input[type="date"],
+.feld input[type="time"],
+.feld input[type="password"],
+.feld input[type="search"] {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #767676;
+  border-radius: 0.5rem;
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text, #1a1a1a);
+  font: inherit;
+}
+
+@media (min-width: 40rem) {
+  .zeile2 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .regel-felder {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .option-zeile {
+    grid-template-columns: 2fr 1fr auto;
+  }
+}
+
+/* grid/flex children may shrink below their content width (no sideways scrolling on phones) */
+.feld,
+.stapel > *,
+.zeile2 > *,
+.regel-felder > *,
+.termin-zeile > * {
+  min-width: 0;
+}
+
+.termin-zeile .wer {
+  overflow-wrap: anywhere;
+}
+
+/* the current status is not clickable but must not look greyed out */
+.status-knoepfe .knopf[aria-pressed="true"]:disabled {
+  opacity: 1;
+  cursor: default;
+}

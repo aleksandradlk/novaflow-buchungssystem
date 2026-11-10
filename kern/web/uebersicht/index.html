@@ -5,18 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
+  <meta name="format-detection" content="telephone=no">
   <title>Übersicht</title>
   <link rel="stylesheet" href="/gemeinsam/basis.css">
   <link rel="stylesheet" href="/kunde/branding.css">
+  <link rel="stylesheet" href="/uebersicht/uebersicht.css">
+  <script type="module" src="/uebersicht/app.js"></script>
 </head>
-<body>
-  <!-- Platzhalter bis Phase 5 (Übersicht). -->
-  <main class="placeholder">
-    <div class="logo" aria-hidden="true"></div>
-    <div class="card">
-      <h1>Übersicht</h1>
-      <p>Der Login-Bereich wird gerade eingerichtet.</p>
-    </div>
+<body class="team">
+  <header class="kopf team-kopf">
+    <img class="logo" alt="" hidden><span class="name"></span>
+    <nav class="team-nav" aria-label="Hauptnavigation" hidden></nav>
+  </header>
+  <main id="inhalt" class="seite team-seite">
+    <p id="meldung" class="meldung" tabindex="-1" aria-live="polite"></p>
+    <div id="app"><p class="laden">Wird geladen …</p></div>
   </main>
 </body>
 </html>

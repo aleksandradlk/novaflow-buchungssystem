@@ -168,7 +168,8 @@ export function feldFehlerZeigen(root, data) {
 
 /** Labeled form field wrapper with optional hint. */
 export function feld({ key, label, pflicht = false, hinweis, eingabe }) {
-  const id = `f-${key.replace(/[^a-z0-9]/gi, '-')}`;
+  // an id set by the caller wins (several forms with the same fields on one page)
+  const id = eingabe.id || `f-${key.replace(/[^a-z0-9]/gi, '-')}`;
   eingabe.id = id;
   if (pflicht) eingabe.setAttribute('aria-required', 'true');
   const kinder = [el('label', { for: id }, label, pflicht ? el('span', { class: 'pflicht', 'aria-hidden': 'true', text: ' *' }) : null)];
@@ -179,4 +180,34 @@ export function feld({ key, label, pflicht = false, hinweis, eingabe }) {
   }
   kinder.push(eingabe);
   return el('div', { class: 'feld', 'data-feld': key }, kinder);
+}
+
+// ---------------------------------------------------------------- time zone conversion
+
+function teile(ms, zeitzone) {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: zeitzone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  });
+  return Object.fromEntries(fmt.formatToParts(new Date(ms)).map((p) => [p.type, p.value]));
+}
+
+/** Local date/time of the customer's time zone → epoch ms (DST aware). */
+export function utcAusLokal(datum, uhrzeit, zeitzone) {
+  const [y, m, d] = datum.split('-').map(Number);
+  const [h, min] = uhrzeit.split(':').map(Number);
+  const naiv = Date.UTC(y, m - 1, d, h, min);
+  const versatz = (ms) => {
+    const p = teile(ms, zeitzone);
+    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - Math.floor(ms / 60000) * 60000;
+  };
+  let utc = naiv - versatz(naiv);
+  utc = naiv - versatz(utc);
+  return utc;
+}
+
+/** Timestamp (ms or ISO/"YYYY-MM-DD hh:mm:ss.sssZ") → { datum, zeit } in the customer's time zone. */
+export function lokal(wert, zeitzone) {
+  const ms = typeof wert === 'number' ? wert : Date.parse(String(wert).replace(' ', 'T'));
+  const p = teile(ms, zeitzone);
+  return { datum: `${p.year}-${p.month}-${p.day}`, zeit: `${p.hour}:${p.minute}` };
 }
