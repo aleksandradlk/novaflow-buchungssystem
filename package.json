@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "node kern/tools/dev.mjs",
     "check": "node kern/tools/check-config.mjs",
+    "n8n": "node kern/tools/n8n.mjs",
     "test": "node --test \"kern/tools/test/*.test.mjs\""
   },
   "dependencies": {

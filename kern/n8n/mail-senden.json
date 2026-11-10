@@ -1,0 +1,188 @@
+{
+  "name": "NF %%KUNDE%% · Mail senden",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": { "values": [{ "name": "schluessel" }] }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0],
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "%%PB_URL%%/api/nf-intern/versand/start",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ schluessel: $json.schluessel }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "name": "Versand starten",
+      "credentials": { "httpHeaderAuth": { "id": "%%CRED_SECRET%%", "name": "NF %%KUNDE%% Secret" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "senden",
+              "leftValue": "={{ $json.senden }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 0],
+      "name": "Senden?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "adapter",
+              "leftValue": "={{ $json.adapter }}",
+              "rightValue": "graph",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [660, -100],
+      "name": "Microsoft 365?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=%%GRAPH_API_URL%%/v1.0/users/{{ encodeURIComponent($json.absender.email) }}/sendMail",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: { subject: $json.betreff, body: { contentType: 'HTML', content: $json.html }, toRecipients: [{ emailAddress: { address: $json.empfaenger } }], replyTo: $json.antwort_an ? [{ emailAddress: { address: $json.antwort_an } }] : [] }, saveToSentItems: true }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, -200],
+      "name": "Senden (Microsoft 365)",
+      "onError": "continueErrorOutput",
+      "credentials": { "oAuth2Api": { "id": "%%CRED_GRAPH%%", "name": "NF %%KUNDE%% Microsoft 365" } }
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ '\"' + String($json.absender.name).replace(/[\"<>]/g, '') + '\" <' + $json.absender.email + '>' }}",
+        "toEmail": "={{ $json.empfaenger }}",
+        "subject": "={{ $json.betreff }}",
+        "emailFormat": "both",
+        "text": "={{ $json.text }}",
+        "html": "={{ $json.html }}",
+        "options": { "appendAttribution": false, "replyTo": "={{ $json.antwort_an }}" }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [880, 0],
+      "name": "Senden (SMTP)",
+      "onError": "continueErrorOutput",
+      "credentials": { "smtp": { "id": "%%CRED_SMTP%%", "name": "NF %%KUNDE%% SMTP" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "%%PB_URL%%/api/nf-intern/versand/ergebnis",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ schluessel: $('Versand starten').item.json.schluessel, ok: true, adapter: $('Versand starten').item.json.adapter }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, -100],
+      "name": "Erfolg melden",
+      "credentials": { "httpHeaderAuth": { "id": "%%CRED_SECRET%%", "name": "NF %%KUNDE%% Secret" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "%%PB_URL%%/api/nf-intern/versand/ergebnis",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ schluessel: $('Versand starten').item.json.schluessel, ok: false, fehler: String(($json.error && ($json.error.message || $json.error)) || 'Versand fehlgeschlagen').slice(0, 400) }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 100],
+      "name": "Fehler melden",
+      "credentials": { "httpHeaderAuth": { "id": "%%CRED_SECRET%%", "name": "NF %%KUNDE%% Secret" } }
+    },
+    {
+      "parameters": {
+        "chatId": "%%TELEGRAM_CHAT_ID%%",
+        "text": "={{ 'Mailversand fehlgeschlagen\\nKunde: %%KUNDE%%\\nArt: ' + $('Versand starten').item.json.art + '\\nVersuch: ' + $json.versuche + ($json.aufgegeben ? ' – keine weiteren Versuche, bitte prüfen.' : ' – wird automatisch wiederholt.') }}",
+        "additionalFields": { "appendAttribution": false }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1320, 100],
+      "name": "Telegram an NovaFlow",
+      "onError": "continueRegularOutput",
+      "credentials": { "telegramApi": { "id": "%%CRED_TELEGRAM%%", "name": "NF Telegram" } }
+    }
+  ],
+  "connections": {
+    "Start": { "main": [[{ "node": "Versand starten", "type": "main", "index": 0 }]] },
+    "Versand starten": { "main": [[{ "node": "Senden?", "type": "main", "index": 0 }]] },
+    "Senden?": { "main": [[{ "node": "Microsoft 365?", "type": "main", "index": 0 }], []] },
+    "Microsoft 365?": {
+      "main": [
+        [{ "node": "Senden (Microsoft 365)", "type": "main", "index": 0 }],
+        [{ "node": "Senden (SMTP)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Senden (Microsoft 365)": {
+      "main": [
+        [{ "node": "Erfolg melden", "type": "main", "index": 0 }],
+        [{ "node": "Fehler melden", "type": "main", "index": 0 }]
+      ]
+    },
+    "Senden (SMTP)": {
+      "main": [
+        [{ "node": "Erfolg melden", "type": "main", "index": 0 }],
+        [{ "node": "Fehler melden", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fehler melden": { "main": [[{ "node": "Telegram an NovaFlow", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "%%ZEITZONE%%",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": true
+}

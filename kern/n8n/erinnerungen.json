@@ -1,0 +1,174 @@
+{
+  "name": "NF %%KUNDE%% · erinnerungen",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -100
+      ],
+      "name": "Zeitplan"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "%%KUNDE%%/erinnerungen-jetzt",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "name": "Jetzt ausführen",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "%%CRED_SECRET%%",
+          "name": "NF %%KUNDE%% Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "%%PB_URL%%/api/nf-intern/erinnerungen",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "name": "Fällige Erinnerungen",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "%%CRED_SECRET%%",
+          "name": "NF %%KUNDE%% Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return ($input.first().json.schluessel || []).map((s) => ({ json: { schluessel: s } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "name": "Einzeln"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "%%ID_MAIL_SENDEN%%",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "schluessel": "={{ $json.schluessel }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "schluessel",
+              "displayName": "schluessel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        660,
+        0
+      ],
+      "name": "Mail senden"
+    }
+  ],
+  "connections": {
+    "Zeitplan": {
+      "main": [
+        [
+          {
+            "node": "Fällige Erinnerungen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jetzt ausführen": {
+      "main": [
+        [
+          {
+            "node": "Fällige Erinnerungen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fällige Erinnerungen": {
+      "main": [
+        [
+          {
+            "node": "Einzeln",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Einzeln": {
+      "main": [
+        [
+          {
+            "node": "Mail senden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "%%ZEITZONE%%",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  },
+  "active": true
+}
