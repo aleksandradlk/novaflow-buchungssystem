@@ -4,13 +4,17 @@
 const STANDARD = require(`${typeof __hooks === "string" ? __hooks : __dirname + "/.."}/nf/mail_standard.js`);
 
 /** Mail types and whether they show appointment details / the manage button. */
+// knopf: which link the button opens; werblich: advertising mail (consent + unsubscribe link required)
 const ARTEN = {
-  bestaetigung: { details: true, knopf: true },
-  folgetermin: { details: true, knopf: true },
-  verschoben: { details: true, knopf: true },
+  bestaetigung: { details: true, knopf: "verwalten" },
+  folgetermin: { details: true, knopf: "verwalten" },
+  verschoben: { details: true, knopf: "verwalten" },
   abgesagt: { details: true, knopf: false },
-  erinnerung: { details: true, knopf: true },
-  status: { details: true, knopf: true },
+  erinnerung: { details: true, knopf: "verwalten" },
+  status: { details: true, knopf: "verwalten" },
+  folgetermin_einladung: { details: true, knopf: "folgetermin" },
+  kampagne: { details: false, knopf: "buchen", werblich: true },
+  nachfass: { details: false, knopf: "buchen", werblich: true },
   anmeldecode: { details: false, knopf: false }, // overview login (staff), not customer mail
 };
 
@@ -18,6 +22,7 @@ const ARTEN = {
 const PLATZHALTER = [
   "vorname", "nachname", "anrede_name", "betrieb", "angebot", "zusatzoptionen", "termintyp",
   "termin", "termin_datum", "termin_uhrzeit", "alter_termin", "wann", "status", "verwalten_link", "code",
+  "buchungs_link", "abmelde_link", "folgetermin_ab", "folgetermin_bis",
 ];
 
 const WOCHENTAGE = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
@@ -127,6 +132,10 @@ function rendern(o) {
     status: o.status ? o.status.name : "",
     verwalten_link: o.verwalten_link || "",
     code: o.code || "",
+    buchungs_link: o.buchungs_link || "",
+    abmelde_link: o.abmelde_link || "",
+    folgetermin_ab: o.folgetermin ? datumLang(o.folgetermin.ab) : "",
+    folgetermin_bis: o.folgetermin ? datumLang(o.folgetermin.bis) : "",
   };
 
   // status mails: own text per status if the customer defined one
@@ -145,7 +154,8 @@ function rendern(o) {
     if (b.termin) details.push([T.label_termin, werte.termin + (b.termintyp ? " – " + b.termintyp : "")]);
     if (o.status) details.push([T.label_status, werte.status]);
   }
-  const knopf = art.knopf && werte.verwalten_link ? { text: ersetzen(T.knopf_verwalten, werte), url: werte.verwalten_link } : null;
+  const knopfUrl = { verwalten: werte.verwalten_link, folgetermin: werte.verwalten_link, buchen: werte.buchungs_link }[art.knopf];
+  const knopf = art.knopf && knopfUrl ? { text: ersetzen(T["knopf_" + art.knopf], werte), url: knopfUrl } : null;
   const f = o.betrieb.firma || {};
   const fuss = [
     f.name,
@@ -159,6 +169,9 @@ function rendern(o) {
   if (knopf) textTeile.push(knopf.text + ":\n" + knopf.url);
   textTeile.push(ersetzen(T.signatur, werte));
   textTeile.push("--\n" + fuss.join("\n"));
+  // advertising mails always carry the unsubscribe link
+  const abmelden = art.werblich ? ersetzen(T.abmelde_hinweis, werte) : "";
+  if (abmelden) textTeile.push(abmelden);
   const text = textTeile.filter(Boolean).join("\n\n") + "\n";
 
   // ---- HTML (inline styles for mail clients; no external resources)
@@ -186,6 +199,10 @@ function rendern(o) {
     '<p style="' + p + '">' + esc(ersetzen(T.signatur, werte)).replace(/\n/g, "<br>") + "</p>",
     '<hr style="border:0;border-top:1px solid #dddddd;margin:24px 0 12px;">',
     '<p style="margin:0;font-size:12px;color:#555555;">' + fuss.map(esc).join("<br>") + "</p>",
+    abmelden
+      ? '<p style="margin:12px 0 0;font-size:12px;color:#555555;">' + esc(ersetzen(T.abmelde_text, werte)) +
+        ' <a href="' + esc(werte.abmelde_link) + '" style="color:#555555;">' + esc(ersetzen(T.abmelde_link_text, werte)) + "</a></p>"
+      : "",
     "</div></body></html>",
     "",
   ].join("\n");
