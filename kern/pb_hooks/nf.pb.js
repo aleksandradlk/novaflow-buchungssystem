@@ -178,6 +178,18 @@ onRecordCreate((e) => {
   require(`${__hooks}/nf/datensaetze.js`).tokenSetzen("token")(e);
 }, "kontakte");
 
+// Admin access with two factors (CLAUDE.md). Always on, except NF_SUPERUSER_2FA=0 (tests, local).
+onBootstrap((e) => {
+  e.next();
+  const an = $os.getenv("NF_SUPERUSER_2FA") !== "0";
+  const su = e.app.findCollectionByNameOrId("_superusers");
+  if (su.mfa.enabled !== an || su.otp.enabled !== an) {
+    su.mfa.enabled = an;
+    su.otp.enabled = an;
+    e.app.save(su);
+  }
+});
+
 // Two-factor login: the one-time code goes through the outbox, not the backend mailer.
 onMailerRecordOTPSend((e) => {
   const basis = require(`${__hooks}/nf/basis.js`);
@@ -186,11 +198,40 @@ onMailerRecordOTPSend((e) => {
   const rec = nachrichten.anmeldecode(e.app, cfg, e.record, e.meta.otpId, e.meta.password);
   nachrichten.melden(cfg, rec);
   // deliberately no e.next(): the backend must not send this mail itself
-}, "users");
+}, "users", "_superusers");
 
 onRecordCreate((e) => {
   require(`${__hooks}/nf/datensaetze.js`).tokenSetzen("token_verwalten")(e);
 }, "buchungen");
+
+// ---------------------------------------------------------------- console commands
+
+// nf-benutzer <email> <inhaber|mitarbeiter> [name] – creates the account or sets a new password.
+// The password is printed once; login additionally needs the code by e-mail.
+$app.rootCmd.addCommand(new Command({
+  use: "nf-benutzer <email> <rolle> [name]",
+  short: "Zugang für die Übersicht anlegen oder Passwort neu setzen",
+  run: (cmd, args) => {
+    if (!args || args.length < 2) throw new Error("Aufruf: nf-benutzer <email> <inhaber|mitarbeiter> [name]");
+    const email = String(args[0]).toLowerCase();
+    const rolle = args[1];
+    if (["inhaber", "mitarbeiter"].indexOf(rolle) === -1) throw new Error("Rolle muss inhaber oder mitarbeiter sein.");
+    let rec;
+    try {
+      rec = $app.findAuthRecordByEmail("users", email);
+    } catch (_) {
+      rec = new Record($app.findCollectionByNameOrId("users"));
+      rec.set("email", email);
+    }
+    const passwort = $security.randomStringWithAlphabet(20, "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789");
+    rec.set("rolle", rolle);
+    if (args[2]) rec.set("name", args.slice(2).join(" "));
+    rec.set("verified", true);
+    rec.setPassword(passwort);
+    $app.save(rec);
+    console.log("Zugang " + email + " (" + rolle + ") – Passwort (nur jetzt sichtbar): " + passwort);
+  },
+}));
 
 // ---------------------------------------------------------------- console command
 $app.rootCmd.addCommand(new Command({

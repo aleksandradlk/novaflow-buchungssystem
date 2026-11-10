@@ -104,6 +104,7 @@ export async function startInstanz({ mutate, kundeDir = customerDir('_beispiel')
     ...process.env,
     NF_WEBHOOK_URL: `http://127.0.0.1:${empfaenger.address().port}`,
     NF_WEBHOOK_SECRET: 'test-geheimnis-1234567890',
+    NF_SUPERUSER_2FA: '0', // tests use the admin API directly; the 2FA itself is tested separately
     ...extraEnv,
   };
   const admin = { email: 'admin@test.example', password: 'test-passwort-123' };

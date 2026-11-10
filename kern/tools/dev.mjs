@@ -79,6 +79,8 @@ const base = `http://127.0.0.1:${port}`;
 process.env.NF_OEFFENTLICHE_URL ||= base;
 // local only: login codes for the overview are also printed to this console
 process.env.NF_DEV = '1';
+// local only: admin UI without second factor (on the server it is always on)
+process.env.NF_SUPERUSER_2FA ??= '0';
 console.log(`
 Lokale Instanz „${customerId}“
   Buchungsseite: ${base}/
