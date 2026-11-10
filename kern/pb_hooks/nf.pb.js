@@ -90,6 +90,73 @@ routerAdd("GET", "/api/nf-intern/offen", (e) => {
   return basis.sicher(e, () => require(`${__hooks}/nf/nachrichten.js`).offen(e));
 });
 
+routerAdd("POST", "/api/nf-intern/kampagne/start", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    require(`${__hooks}/nf/nachrichten.js`).pruefeSecret(e);
+    return e.json(200, require(`${__hooks}/nf/kampagne.js`).starten($app));
+  });
+});
+
+routerAdd("POST", "/api/nf-intern/etappe", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    require(`${__hooks}/nf/nachrichten.js`).pruefeSecret(e);
+    return e.json(200, require(`${__hooks}/nf/kampagne.js`).etappe($app));
+  });
+});
+
+routerAdd("POST", "/api/nf-intern/nachfass", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    require(`${__hooks}/nf/nachrichten.js`).pruefeSecret(e);
+    return e.json(200, require(`${__hooks}/nf/kampagne.js`).nachfass($app));
+  });
+});
+
+routerAdd("POST", "/api/nf-intern/folgetermin-einladungen", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    require(`${__hooks}/nf/nachrichten.js`).pruefeSecret(e);
+    return e.json(200, require(`${__hooks}/nf/kampagne.js`).folgeterminEinladungen($app));
+  });
+});
+
+routerAdd("POST", "/api/nf-intern/loeschung", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    require(`${__hooks}/nf/nachrichten.js`).pruefeSecret(e);
+    return e.json(200, require(`${__hooks}/nf/loeschung.js`).ausfuehren($app));
+  });
+});
+
+// ---------------------------------------------------------------- routes for the overview (owner only)
+
+routerAdd("POST", "/api/nf-team/import", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    basis.nurInhaber(e);
+    const body = e.requestInfo().body || {};
+    return e.json(200, require(`${__hooks}/nf/import.js`).importieren($app, body.zeilen));
+  });
+}, $apis.requireAuth(), $apis.bodyLimit(10 * 1024 * 1024));
+
+routerAdd("POST", "/api/nf-team/kampagne/start", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    basis.nurInhaber(e);
+    return e.json(200, require(`${__hooks}/nf/kampagne.js`).starten($app));
+  });
+}, $apis.requireAuth());
+
+routerAdd("GET", "/api/nf-team/kampagne/stand", (e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  return basis.sicher(e, () => {
+    basis.nurInhaber(e);
+    return e.json(200, require(`${__hooks}/nf/kampagne.js`).stand($app));
+  });
+}, $apis.requireAuth());
+
 // ---------------------------------------------------------------- record hooks
 onRecordUpdateRequest((e) => {
   require(`${__hooks}/nf/datensaetze.js`).buchungAktualisieren(e);

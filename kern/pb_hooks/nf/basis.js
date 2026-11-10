@@ -82,6 +82,7 @@ function einstellungen(app) {
     module: json(rec, "module", {}),
     formular: json(rec, "formular", {}),
     rollen: json(rec, "rollen", {}),
+    loeschfristen: json(rec, "loeschfristen", {}),
     rechtliches: json(rec, "rechtliches", {}),
     mail_modus: rec.getString("mail_modus"),
     mail_adapter: rec.getString("mail_adapter"),
@@ -136,6 +137,15 @@ function pbDatum(ms) {
 /** stored date string -> epoch ms (NaN if empty) */
 function alsMs(s) {
   return s ? Date.parse(String(s).replace(" ", "T")) : NaN;
+}
+
+/** Only the owner (or a superuser) – for the overview's own routes. */
+function nurInhaber(e) {
+  const a = e.auth;
+  if (a && a.isSuperuser()) return;
+  if (!a || a.collection().name !== "users" || a.getString("rolle") !== "inhaber") {
+    throw fehler(403, "Diese Funktion ist nur für Inhaber.");
+  }
 }
 
 /** Page frame info for every public page: name, logo, time zone, texts, legal links. */
@@ -222,6 +232,7 @@ module.exports = {
   pbDatum: pbDatum,
   alsMs: alsMs,
   seite: seite,
+  nurInhaber: nurInhaber,
   heuteLokal: heuteLokal,
   token: token,
   neuesToken: neuesToken,

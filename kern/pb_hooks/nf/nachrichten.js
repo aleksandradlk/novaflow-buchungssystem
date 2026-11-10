@@ -43,6 +43,8 @@ function oeffentlicheUrl(cfg) {
 function aktiv(cfg, art) {
   if (art === "anmeldecode") return true;
   if (art === "status") return !!cfg.module.status;
+  if (art === "kampagne" || art === "nachfass") return !!cfg.module.kampagne;
+  if (art === "folgetermin_einladung") return !!cfg.module.folgetermin;
   return !!cfg.module.nachrichten;
 }
 
@@ -79,8 +81,9 @@ function erstellen(app, cfg, art, buchung, opts) {
       termin: z.toLocal(basis.alsMs(buchung.getString("termin_start"))),
       alter_termin: opts.alter_start ? z.toLocal(basis.alsMs(opts.alter_start)) : null,
     },
-    status: opts.status || null,
+    status: opts.status && typeof opts.status === "object" ? opts.status : null,
     tage: opts.tage,
+    folgetermin: opts.folgetermin || null,
     verwalten_link: oeffentlicheUrl(cfg) + "/verwalten/?t=" + buchung.getString("token_verwalten"),
   });
 
@@ -89,7 +92,7 @@ function erstellen(app, cfg, art, buchung, opts) {
   rec.set("kontakt", kontakt.id);
   rec.set("buchung", buchung.id);
   rec.set("schluessel", schluessel);
-  rec.set("status", "offen");
+  rec.set("status", typeof opts.status === "string" ? opts.status : "offen");
   rec.set("empfaenger", kontakt.getString("email"));
   rec.set("betreff", mail.betreff);
   rec.set("text", mail.text);
@@ -177,6 +180,15 @@ function versandStart(e) {
     const jetzt = Date.now();
     const st = rec.getString("status");
     if (st === "gesendet") { antwort = { senden: false, grund: "bereits gesendet" }; return; }
+    if (st === "geplant" || st === "uebersprungen") { antwort = { senden: false, grund: "nicht freigegeben" }; return; }
+    // advertising mails: consent may have been withdrawn or the contact booked meanwhile
+    if (!require(`${__hooks}/nf/kampagne.js`).versandErlaubt(tx, cfg, rec)) {
+      rec.set("status", "uebersprungen");
+      rec.set("ergebnis", "übersprungen: keine Einwilligung mehr, abgemeldet oder bereits gebucht");
+      tx.save(rec);
+      antwort = { senden: false, grund: "übersprungen" };
+      return;
+    }
     if (st === "in_versand" && minutenAlt(rec.getString("letzter_versuch"), jetzt) < NACHHOLEN.inVersandMin) {
       antwort = { senden: false, grund: "wird gerade gesendet" };
       return;
@@ -233,6 +245,16 @@ function versandErgebnis(e) {
     rec.set("ergebnis", ("fehler: " + String(x.body.fehler || "unbekannt")).slice(0, 500));
   }
   $app.save(rec);
+
+  // advertising mails: timestamps on the contact (basis for the follow-up series)
+  const art = rec.getString("art");
+  if (ok && (art === "kampagne" || art === "nachfass")) {
+    try {
+      const k = $app.findRecordById("kontakte", rec.getString("kontakt"));
+      k.set(art === "kampagne" ? "kampagne_am" : "nachfass_" + x.s.split(":")[2] + "_am", jetzt);
+      $app.save(k);
+    } catch (_) { /* contact deleted meanwhile */ }
+  }
 
   // status mails: remember in the status log that the mail went out
   if (ok && rec.getString("art") === "status") {
@@ -308,6 +330,7 @@ module.exports = {
   NACHHOLEN: NACHHOLEN,
   erstellen: erstellen,
   anmeldecode: anmeldecode,
+  pruefeSecret: pruefeSecret,
   melden: melden,
   versandStart: versandStart,
   versandErgebnis: versandErgebnis,
