@@ -147,11 +147,34 @@ export async function startInstanz({ mutate, kundeDir = customerDir('_beispiel')
 
   const adminToken = await login('_superusers', admin.email, admin.password);
 
+  /** Code of a requested login (read from the outbox like the mail would deliver it). */
+  async function anmeldecode(otpId) {
+    // the backend hands the code over in the background after answering the request
+    const n = await warteAuf(async () => {
+      const r = await api('GET', `/api/collections/nachrichten/records?filter=${encodeURIComponent(`schluessel = "anmeldecode:${otpId}"`)}`, { token: adminToken });
+      return r.json.items[0];
+    }, { timeout: 5000, schritt: 50, text: `Anmeldecode für ${otpId}` });
+    return n.text.match(/\b(\d{6})\b/)[1];
+  }
+
+  /** Overview login with two factors: password, then one-time code. */
+  async function teamLogin(email, password) {
+    const pw = await api('POST', '/api/collections/users/auth-with-password', { body: { identity: email, password } });
+    if (!pw.json || !pw.json.mfaId) throw new Error(`Zwei-Faktor erwartet (${pw.status}): ${pw.text}`);
+    const otp = await api('POST', '/api/collections/users/request-otp', { body: { email } });
+    const code = await anmeldecode(otp.json.otpId);
+    const r = await api('POST', '/api/collections/users/auth-with-otp', { body: { otpId: otp.json.otpId, password: code, mfaId: pw.json.mfaId } });
+    if (r.status !== 200) throw new Error(`Anmeldung mit Code fehlgeschlagen (${r.status}): ${r.text}`);
+    return r.json.token;
+  }
+
   return {
     base,
     env,
     api,
     login,
+    teamLogin,
+    anmeldecode,
     adminToken,
     webhooks,
     log: () => log,

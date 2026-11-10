@@ -9,7 +9,7 @@ const config = testKonfiguration();
 const wfs = buildWorkflows({ config, pbUrl: 'http://127.0.0.1:8090/', telegramChatId: '42' });
 const nachName = Object.fromEntries(wfs.map((w) => [w.name.split(' · ')[1], w]));
 
-test('sechs Workflows: Mail senden, drei Ereignisse, Erinnerungen, Nachholen – alle aktiv', () => {
+test('sieben Workflows: Mail senden, vier Ereignisse (inkl. Anmeldecode), Erinnerungen, Nachholen – alle aktiv', () => {
   assert.deepEqual(Object.keys(nachName).sort(), ['Mail senden', ...EREIGNISSE, 'erinnerungen', 'nachholen'].sort());
   assert.ok(wfs.every((w) => w.active === true));
 });

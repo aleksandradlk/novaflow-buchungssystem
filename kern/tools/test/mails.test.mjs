@@ -183,7 +183,10 @@ describe('Mails mit echtem n8n', { skip: N8N_DIR ? false : 'NF_TEST_N8N_DIR nich
   test('Microsoft 365: Versand über Graph, Token wird zwischengespeichert', async () => {
     await einstellungen({ mail_adapter: 'graph' });
     try {
+      // second mail only after the first one is out: then the cached token must be reused
+      // (two mails at the very same moment may both fetch a token – harmless, see E-008)
       await buchen(slot('2030-01-08', '09:00'), { kontakt: { ...KONTAKT, email: 'graph1@example.com' } });
+      await warteAuf(() => graph.aufrufe.some((a) => a.pfad.endsWith('/sendMail')), { text: 'erste Graph-Mail' });
       await buchen(slot('2030-01-08', '09:30'), { kontakt: { ...KONTAKT, email: 'graph2@example.com' } });
       const sends = await warteAuf(() => {
         const s = graph.aufrufe.filter((a) => a.pfad.endsWith('/sendMail'));
@@ -204,6 +207,28 @@ describe('Mails mit echtem n8n', { skip: N8N_DIR ? false : 'NF_TEST_N8N_DIR nich
     } finally {
       await einstellungen({ mail_adapter: 'smtp' });
     }
+  });
+
+  test('Anmeldecode für die Übersicht kommt an – an die echte Adresse, auch im Testmodus', async () => {
+    const neu = await I.api('POST', '/api/collections/users/records', {
+      token: I.adminToken, body: { email: 'chefin@example.com', password: 'passwort-123', passwordConfirm: 'passwort-123', rolle: 'inhaber', name: 'Chefin' },
+    });
+    assert.equal(neu.status, 200, neu.text);
+    const vorher = postfach.mails.length;
+    const pw = await I.api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'chefin@example.com', password: 'passwort-123' } });
+    const otp = await I.api('POST', '/api/collections/users/request-otp', { body: { email: 'chefin@example.com' } });
+    await warteAuf(() => postfach.mails.length > vorher, { text: 'Anmeldecode-Mail' });
+    const m = postfach.mails.at(-1);
+    assert.deepEqual(m.an, ['chefin@example.com']);
+    const code = m.betreff.match(/^Ihr Anmeldecode: (\d{6})$/)[1];
+    const login = await I.api('POST', '/api/collections/users/auth-with-otp', { body: { otpId: otp.json.otpId, password: code, mfaId: pw.json.mfaId } });
+    assert.equal(login.status, 200, 'mit dem Code aus der Mail anmelden');
+    const n = await warteAuf(async () => {
+      const [x] = await nachrichten(`schluessel = "anmeldecode:${otp.json.otpId}"`);
+      return x && x.status === 'gesendet' ? x : null;
+    }, { text: 'Anmeldecode gesendet' });
+    assert.equal(n.text, '', 'Code wird nach dem Versand nicht aufbewahrt');
+    assert.doesNotMatch(n.betreff, /\d{6}/);
   });
 
   test('Fehler: Telegram ohne personenbezogene Daten, danach automatisch nachgeholt', async () => {

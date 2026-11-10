@@ -348,7 +348,7 @@ describe('Rollen und Zugriffsregeln', () => {
   before(async () => {
     const neu = { email: 'inhaber@test.example', password: 'inhaber-pw-123', passwordConfirm: 'inhaber-pw-123', rolle: 'inhaber', name: 'Inhaber' };
     assert.equal((await I.api('POST', '/api/collections/users/records', { body: neu, token: I.adminToken })).status, 200);
-    inhaber = await I.login('users', neu.email, neu.password);
+    inhaber = await I.teamLogin(neu.email, neu.password);
     const b = await buchen(slot('2030-02-14', '08:00'));
     const [rec] = await adminHole('buchungen', `termin_start = "${slot('2030-02-14', '08:00').replace('T', ' ')}"`);
     buchungId = rec.id;
@@ -364,6 +364,28 @@ describe('Rollen und Zugriffsregeln', () => {
     assert.ok(anlegen.status >= 400);
   });
 
+  test('Zwei-Faktor: Passwort allein reicht nicht; Code geht an die echte Adresse und wird danach gelöscht', async () => {
+    const pw = await I.api('POST', '/api/collections/users/auth-with-password', { body: { identity: 'inhaber@test.example', password: 'inhaber-pw-123' } });
+    assert.equal(pw.status, 401);
+    assert.ok(pw.json.mfaId, 'zweiter Faktor verlangt');
+    assert.ok(!pw.json.token);
+
+    const otp = await I.api('POST', '/api/collections/users/request-otp', { body: { email: 'inhaber@test.example' } });
+    const schluessel = `anmeldecode:${otp.json.otpId}`;
+    await I.anmeldecode(otp.json.otpId); // wait until handed over
+    const start = await fetch(`${I.base}/api/nf-intern/versand/start`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-NF-Secret': I.env.NF_WEBHOOK_SECRET }, body: JSON.stringify({ schluessel }),
+    }).then((r) => r.json());
+    assert.equal(start.empfaenger, 'inhaber@test.example', 'auch im Testmodus an die echte Adresse');
+    assert.match(start.betreff, /^Ihr Anmeldecode: \d{6}$/);
+    await fetch(`${I.base}/api/nf-intern/versand/ergebnis`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-NF-Secret': I.env.NF_WEBHOOK_SECRET }, body: JSON.stringify({ schluessel, ok: true }),
+    });
+    const [n] = (await I.api('GET', `/api/collections/nachrichten/records?filter=${encodeURIComponent(`schluessel = "${schluessel}"`)}`, { token: I.adminToken })).json.items;
+    assert.equal(n.text, '');
+    assert.doesNotMatch(n.betreff, /\d{6}/);
+  });
+
   test('Inhaber legt bis zu 3 Mitarbeiter an, der 4. wird abgelehnt', async () => {
     for (let i = 1; i <= 4; i++) {
       const body = { email: `ma${i}@test.example`, password: 'mitarbeiter-pw-1', passwordConfirm: 'mitarbeiter-pw-1', rolle: 'mitarbeiter', name: `MA ${i}` };
@@ -374,7 +396,17 @@ describe('Rollen und Zugriffsregeln', () => {
         assert.match(r.json.message, /maximale Anzahl/);
       }
     }
-    mitarbeiter = await I.login('users', 'ma1@test.example', 'mitarbeiter-pw-1');
+    mitarbeiter = await I.teamLogin('ma1@test.example', 'mitarbeiter-pw-1');
+  });
+
+  test('Anmeldecodes sind für das Team unsichtbar', async () => {
+    const otp = await I.api('POST', '/api/collections/users/request-otp', { body: { email: 'inhaber@test.example' } });
+    await I.anmeldecode(otp.json.otpId);
+    for (const token of [inhaber, mitarbeiter]) {
+      const r = await I.api('GET', '/api/collections/nachrichten/records?perPage=500', { token });
+      assert.equal(r.status, 200);
+      assert.ok(r.json.items.every((x) => x.art !== 'anmeldecode'));
+    }
   });
 
   test('Tokens sind auch für das Team unsichtbar', async () => {

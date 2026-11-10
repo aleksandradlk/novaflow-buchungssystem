@@ -58,7 +58,10 @@ test('zusammengebaute Seiten: keine Tool-Namen, keine externen Adressen', () => 
         const content = fs.readFileSync(file, 'utf8').replace(/xmlns(:\w+)?="http:\/\/www\.w3\.org\/[^"]*"/g, '');
         const rel = path.relative(out, file);
         assert.doesNotMatch(content, TOOL_NAMES, `${id}: ${rel}`);
-        assert.doesNotMatch(content, /(https?:)?\/\/[a-z0-9.-]+\.[a-z]{2,}/i, `${id}: ${rel} enthält eine externe Adresse`);
+        // Only exception: the tour link to Google Maps in the staff area (opened by a click,
+        // nothing is loaded beforehand – docs/BAUAUFTRAG_VORLAGE.md, module touren).
+        const geprueft = rel === path.join('uebersicht', 'touren.js') ? content.replace("'https://www.google.com/maps/dir/?api=1'", '') : content;
+        assert.doesNotMatch(geprueft, /(https?:)?\/\/[a-z0-9.-]+\.[a-z]{2,}/i, `${id}: ${rel} enthält eine externe Adresse`);
       }
       assert.ok(fs.existsSync(path.join(out, 'kunde', 'branding.css')));
       assert.ok(fs.existsSync(path.join(out, 'uebersicht', 'index.html')));
