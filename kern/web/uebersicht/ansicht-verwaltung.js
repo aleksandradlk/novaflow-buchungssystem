@@ -4,6 +4,7 @@
 import { el, feld, feldFehlerLeeren, feldFehlerZeigen, formatDatum, heute } from '/gemeinsam/nf.js';
 import { cfgAus, kontext } from './app.js';
 import { alle, aktuell, api, feldFehler, fehlerText, hinweis } from './team.js';
+import { exportBereich, importBereich, kampagneBereich } from './ansicht-daten.js';
 
 const BEREICHE = [
   ['einstellungen', 'Einstellungen'],
@@ -11,8 +12,15 @@ const BEREICHE = [
   ['terminregeln', 'Terminregeln'],
   ['sperrtage', 'Sperrtage'],
   ['benutzer', 'Benutzer'],
-  ['export', 'Export'],
+  ['import', 'Import', 'import'],
+  ['kampagne', 'Kampagne', 'kampagne'],
+  ['export', 'Export', 'export'],
 ];
+
+/** Areas of booked modules only. */
+function bereiche() {
+  return BEREICHE.filter(([, , modul]) => !modul || kontext.cfg.module[modul]);
+}
 const WOCHENTAGE = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
 // ---------------------------------------------------------------- helpers
@@ -368,7 +376,8 @@ async function benutzer(neuZeichnen) {
 // ---------------------------------------------------------------- frame
 
 export async function verwaltungAnsicht(arg) {
-  const bereich = BEREICHE.some(([k]) => k === arg) ? arg : 'einstellungen';
+  const sichtbar = bereiche();
+  const bereich = sichtbar.some(([k]) => k === arg) ? arg : 'einstellungen';
   const box = el('div', { class: 'verwaltung-inhalt' });
   const neuZeichnen = async () => {
     const inhalt = await {
@@ -377,18 +386,20 @@ export async function verwaltungAnsicht(arg) {
       terminregeln: () => terminregeln(neuZeichnen),
       sperrtage: () => sperrtage(neuZeichnen),
       benutzer: () => benutzer(neuZeichnen),
-      export: async () => el('p', { class: 'hinweis-box', text: 'Der CSV-Export aller Daten folgt in Phase 6.' }),
+      import: async () => importBereich(),
+      kampagne: () => kampagneBereich(neuZeichnen),
+      export: async () => exportBereich(),
     }[bereich]();
     box.replaceChildren(inhalt);
   };
   await neuZeichnen();
-  const titel = BEREICHE.find(([k]) => k === bereich)[1];
+  const titel = sichtbar.find(([k]) => k === bereich)[1];
   return {
     titel: `Verwaltung: ${titel}`,
     element: el('section', { class: 'verwaltung' },
       el('h1', { text: 'Verwaltung' }),
       el('nav', { class: 'reiter', 'aria-label': 'Bereiche der Verwaltung' },
-        BEREICHE.map(([k, t]) => el('a', { href: `#/verwaltung/${k}`, 'aria-current': k === bereich ? 'page' : undefined, text: t }))),
+        sichtbar.map(([k, t]) => el('a', { href: `#/verwaltung/${k}`, 'aria-current': k === bereich ? 'page' : undefined, text: t }))),
       el('h2', { class: 'unsichtbar', text: titel }),
       box),
   };
