@@ -4,6 +4,7 @@ Logbuch aller grundlegenden Entscheidungen für die Vorlage. Neue Einträge oben
 
 | Datum | Entscheidung | Begründung |
 |---|---|---|
+| 10.11.2026 | Übersicht: Zwei-Faktor-Anmeldung, Sitzung, Kontakte, Touren | siehe E-010 |
 | 10.11.2026 | n8n-Version, Import und Testumgebung | siehe E-009 |
 | 10.11.2026 | Mailversand über Warteschlange (Outbox) in der Kundeninstanz | siehe E-008 |
 | 09.11.2026 | Öffentliche Seiten: Texte, Abmeldung, Kalender | siehe E-007 |
@@ -15,6 +16,16 @@ Logbuch aller grundlegenden Entscheidungen für die Vorlage. Neue Einträge oben
 | 09.11.2026 | PocketBase statt Postgres + eigenes Backend | siehe E-001 |
 
 ---
+
+## E-010 · 10.11.2026 · Übersicht: Zwei-Faktor-Anmeldung, Sitzung, Kontakte, Touren
+
+- **Zwei Faktoren für alle Übersicht-Zugänge** (CLAUDE.md: „Admin-Zugänge mit Zwei-Faktor“): Passwort + 6-stelliger Code per E-Mail (eingebaute Mehrfaktor-Anmeldung des Backends). Den Code-Versand fängt ein Hook ab und leitet ihn durch die Warteschlange und „Mail senden“ – das Backend verschickt nie selbst Mails; seine eigenen Anmelde-Warnmails sind abgeschaltet. Codes gehen auch im Testmodus an die echte Adresse, sind für das Team nicht lesbar und werden nach dem Versand gelöscht. Lokal (`npm run dev`) steht der Code zusätzlich in der Konsole.
+- **Sitzung:** Das Anmelde-Token liegt in `sessionStorage` (endet mit dem Tab). Nur wenn die Person „angemeldet bleiben“ anhakt, in `localStorage` (7 Tage). Das betrifft nur den Login-Bereich; die öffentlichen Seiten speichern weiterhin nichts.
+- **Zugriff:** Die Übersicht nutzt die Standard-API der Instanz mit den Zugriffsregeln aus Phase 2 (keine eigenen Team-Routen). Mitarbeiter sehen keine Verwaltung; versucht jemand die Adresse direkt, landet er bei den Terminen – die Regeln verhindern Änderungen ohnehin.
+- **Offene Kontakte** = Kontakte ohne aktive Buchung im aktuellen Buchungszeitraum (`buchbar_ab`–`buchbar_bis`), z. B. importierte Bestandskunden oder Absagen.
+- **Touren:** Termine einer Woche mit vollständiger Adresse, sortiert nach PLZ, dann Ort, dann Straße; gleiche Adresse = ein Stopp. Start ist die Adresse des Betriebs, Ziel der letzte Stopp. Optional nach Termintyp gefiltert. Höchstens 9 Zwischenstopps pro Link (Grenze von Google Maps), sonst mehrere Links nacheinander. Der Link ist die einzige externe Adresse in den ausgelieferten Dateien (vom Wächter-Test ausdrücklich erlaubt).
+- **Erster Inhaber-Zugang** wird bis Phase 7 im Admin-Bereich angelegt; danach verwaltet der Inhaber die Zugänge selbst. Passwort vergessen: Inhaber setzt Mitarbeitern ein neues; für den Inhaber selbst setzt NovaFlow es zurück (kein Mail-Link, damit keine weitere Mail-Art nötig ist).
+- **Microsoft 365, Nachtrag zu E-008:** Gehen die allerersten zwei Mails exakt gleichzeitig raus, holt n8n zweimal ein Token. Danach wird es wiederverwendet. Harmlos; der Test prüft die Wiederverwendung bei nacheinander versendeten Mails.
 
 ## E-009 · 10.11.2026 · n8n-Version, Import und Testumgebung
 

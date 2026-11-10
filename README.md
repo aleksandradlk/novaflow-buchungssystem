@@ -4,7 +4,7 @@ Vorlage für ein Online-Buchungssystem für Dienstleister mit festen Terminen (W
 
 Verbindliche Regeln: [`CLAUDE.md`](CLAUDE.md) · Vollständiger Auftrag: [`docs/BAUAUFTRAG_VORLAGE.md`](docs/BAUAUFTRAG_VORLAGE.md) · Entscheidungen: [`docs/ENTSCHEIDUNGEN.md`](docs/ENTSCHEIDUNGEN.md)
 
-> **Stand:** Phase 4 – Seiten, API und Transaktionsmails (Bestätigung, Folgetermin, Verschieben, Absage, Erinnerung, Status) über n8n stehen; Übersicht folgt in Phase 5. Die Module unten werden Phase für Phase gebaut.
+> **Stand:** Phase 5 – Buchungsseiten, API, Transaktionsmails über n8n und die Übersicht (Login-Bereich mit Touren und Verwaltung) stehen; Kampagne, Import, Export und Löschung folgen in Phase 6. Die Module unten werden Phase für Phase gebaut.
 
 ## Was die Vorlage kann
 
@@ -29,7 +29,7 @@ Datenschutz (DSGVO) ist fester Bestandteil: Hosting nur in Deutschland, keine ex
 kern/
   schema/                JSON-Schemas für die Kundenkonfiguration
   web/buchung/           öffentliche Seiten: Buchung (/), /verwalten/, /abmelden/
-  web/uebersicht/        Login-Bereich (ab Phase 5, jetzt Platzhalter)
+  web/uebersicht/        Übersicht für Inhaber und Mitarbeiter (Login, Termine, Kontakte, Touren, Verwaltung)
   web/gemeinsam/         gemeinsames CSS, Kalender, Helfer, Standardtexte (texte.js)
   pb_migrations/         Datenmodell: Collections, Felder, Zugriffsregeln, Rate-Limit
   pb_hooks/              eigene Routen /api/nf/*, Status-Hook, Rollen, Startwerte-Import
@@ -96,6 +96,22 @@ Die Seiten sind reines HTML/CSS/JavaScript ohne Build-Schritt, ohne Cookies, ohn
 
 **Branding:** Farben, Schrift und Logo kommen ausschließlich aus `kunden/<kunde>/branding/` (siehe Test „Branding und Ansprache kommen nur aus dem Kundenordner“).
 
+## Übersicht (Login-Bereich)
+
+`/uebersicht/` – für Handy und PC, Anmeldung mit **zwei Faktoren**: Passwort, dann ein 6-stelliger Code per E-Mail (über „Mail senden“, gilt 10 Minuten; lokal mit `npm run dev` steht er zusätzlich in der Konsole). Ohne Häkchen „angemeldet bleiben“ endet die Anmeldung mit dem Schließen des Tabs, mit Häkchen nach 7 Tagen.
+
+| Bereich | Inhaber | Mitarbeiter |
+|---|---|---|
+| **Termine** – Woche (KW) und Tag, Details mit Kontakt, Zusatzfeldern, Fotos, Verlauf | ✔ | ✔ |
+| **Status setzen** – Knöpfe aus `status.json`; ✉ = Kunde bekommt automatisch eine Mail | ✔ | ✔ |
+| **Kontakte** – Kontakte ohne Buchung im aktuellen Buchungszeitraum | ✔ | ✔ |
+| **Touren** – Termine mit Adresse einer Woche nach PLZ, Route als Google-Maps-Link (Modul `touren`) | ✔ | ✔ |
+| **Verwaltung** – Einstellungen, Angebote, Terminregeln, Sperrtage, Benutzer (Export folgt in Phase 6) | ✔ | – |
+
+**Ersten Inhaber-Zugang anlegen** (bis die Deploy-Skripte in Phase 7 das übernehmen): im Admin-Bereich `/_/` unter `users` einen Datensatz mit `rolle = inhaber` anlegen. Weitere Zugänge legt der Inhaber danach selbst in der Verwaltung an (Mitarbeiter bis zur Grenze aus `kunde.json → rollen.max_mitarbeiter`).
+
+Der Touren-Link öffnet Google Maps erst beim Klick (kein API-Schlüssel, vorher wird nichts geladen); die Seite weist darauf hin, dass dabei die Adressen an Google gehen. Google erlaubt höchstens 9 Zwischenstopps pro Link – bei mehr Stopps gibt es mehrere aneinander anschließende Links.
+
 ## Mails und Automationen
 
 Alle Mails laufen über eine **Warteschlange** in der Kundeninstanz:
@@ -103,6 +119,7 @@ Alle Mails laufen über eine **Warteschlange** in der Kundeninstanz:
 1. Bei einem Ereignis (Buchung, Folgetermin, Verschieben, Absage, Statuswechsel mit Mail-Flag) erzeugt die Instanz die fertige Mail (Text + HTML, du/Sie, Absender und Signatur des Kunden) und legt sie in `nachrichten` ab – mit eindeutigem Schlüssel, damit nichts doppelt verschickt wird.
 2. Ein Webhook an n8n meldet nur den Schlüssel (keine personenbezogenen Daten).
 3. Der n8n-Workflow **Mail senden** holt die Mail ab, verschickt sie über **SMTP** oder **Microsoft 365** (Graph, Token wird zwischengespeichert) und meldet das Ergebnis zurück. Im Testmodus (`mail_modus = test`) geht alles an `test_empfaenger`, im Betreff steht der echte Empfänger.
+   Anmeldecodes für die Übersicht laufen denselben Weg (Workflow **anmeldung**), gehen aber immer an die echte Adresse und werden nach dem Versand gelöscht.
 4. **erinnerungen** (täglich 08:00) legt Erinnerungen für Termine in N Tagen an (`nachrichten.json → erinnerungen_tage_vorher`). **nachholen** (alle 15 Min.) verschickt, was liegen geblieben oder fehlgeschlagen ist (bis zu 5 Versuche). Bei Fehlern geht eine Telegram-Nachricht ohne personenbezogene Daten an NovaFlow.
 
 **Texte:** Standardtexte (neutral, du/Sie) in `kern/pb_hooks/nf/mail_standard.js`; jeder Schlüssel ist pro Kunde in `kunden/<kunde>/texte/mails.json` überschreibbar, auch eigene Texte je Status (`status_<code>_betreff`, `status_<code>_inhalt`). Platzhalter: `{{vorname}}`, `{{nachname}}`, `{{anrede_name}}`, `{{betrieb}}`, `{{angebot}}`, `{{termin}}`, `{{status}}`, `{{wann}}`, `{{verwalten_link}}` u. a. – Tippfehler meldet `npm run check`.
