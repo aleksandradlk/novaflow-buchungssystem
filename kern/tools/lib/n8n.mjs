@@ -8,7 +8,7 @@ import path from 'node:path';
 import { KERN } from './paths.mjs';
 
 const VORLAGEN = path.join(KERN, 'n8n');
-export const EREIGNISSE = ['neue-buchung', 'verschoben-abgesagt', 'status'];
+export const EREIGNISSE = ['neue-buchung', 'verschoben-abgesagt', 'status', 'anmeldung'];
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
 function hash(text) {

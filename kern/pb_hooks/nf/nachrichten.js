@@ -13,6 +13,7 @@ const vorlagen = require(`${__hooks}/nf/mailvorlagen.js`);
 const fehler = basis.fehler;
 
 const WEBHOOK = {
+  anmeldecode: "anmeldung",
   bestaetigung: "neue-buchung",
   folgetermin: "neue-buchung",
   verschoben: "verschoben-abgesagt",
@@ -40,6 +41,7 @@ function oeffentlicheUrl(cfg) {
 
 /** Is this mail type switched on for the customer? */
 function aktiv(cfg, art) {
+  if (art === "anmeldecode") return true;
   if (art === "status") return !!cfg.module.status;
   return !!cfg.module.nachrichten;
 }
@@ -94,6 +96,34 @@ function erstellen(app, cfg, art, buchung, opts) {
   rec.set("html", mail.html);
   rec.set("versuche", 0);
   app.save(rec);
+  return rec;
+}
+
+/**
+ * Login code for the overview (two-factor). Called from the backend's OTP mail hook
+ * instead of its own mailer. Always goes to the real staff address, also in test mode.
+ */
+function anmeldecode(app, cfg, user, otpId, code) {
+  const schluessel = "anmeldecode:" + otpId;
+  const mail = vorlagen.rendern({
+    art: "anmeldecode",
+    ansprache: cfg.ansprache,
+    eigene: cfg.mailvorlagen,
+    betrieb: { name: cfg.betrieb.name, firma: cfg.betrieb.firma, farbe: cfg.betrieb.farbe, auf_farbe: cfg.betrieb.auf_farbe },
+    kontakt: { vorname: user.getString("name"), nachname: "" },
+    code: code,
+  });
+  const rec = new Record(app.findCollectionByNameOrId("nachrichten"));
+  rec.set("art", "anmeldecode");
+  rec.set("schluessel", schluessel);
+  rec.set("status", "offen");
+  rec.set("empfaenger", user.getString("email"));
+  rec.set("betreff", mail.betreff);
+  rec.set("text", mail.text);
+  rec.set("html", mail.html);
+  rec.set("versuche", 0);
+  app.save(rec);
+  if ($os.getenv("NF_DEV") === "1") console.log("Anmeldecode (nur lokal sichtbar): " + code + " für " + user.getString("email"));
   return rec;
 }
 
@@ -157,7 +187,8 @@ function versandStart(e) {
     tx.save(rec);
 
     const echt = rec.getString("empfaenger");
-    const test = cfg.mail_modus !== "live";
+    // login codes always go to the real staff address
+    const test = cfg.mail_modus !== "live" && rec.getString("art") !== "anmeldecode";
     antwort = {
       senden: true,
       schluessel: s,
@@ -191,6 +222,12 @@ function versandErgebnis(e) {
     rec.set("status", "gesendet");
     rec.set("gesendet_am", jetzt);
     rec.set("ergebnis", ("gesendet " + (x.body.adapter || "")).trim());
+    // the code is not kept once it has been delivered
+    if (rec.getString("art") === "anmeldecode") {
+      rec.set("text", "");
+      rec.set("html", "");
+      rec.set("betreff", "Anmeldecode");
+    }
   } else {
     rec.set("status", "fehler");
     rec.set("ergebnis", ("fehler: " + String(x.body.fehler || "unbekannt")).slice(0, 500));
@@ -270,6 +307,7 @@ function offen(e) {
 module.exports = {
   NACHHOLEN: NACHHOLEN,
   erstellen: erstellen,
+  anmeldecode: anmeldecode,
   melden: melden,
   versandStart: versandStart,
   versandErgebnis: versandErgebnis,

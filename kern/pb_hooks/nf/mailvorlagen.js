@@ -11,12 +11,13 @@ const ARTEN = {
   abgesagt: { details: true, knopf: false },
   erinnerung: { details: true, knopf: true },
   status: { details: true, knopf: true },
+  anmeldecode: { details: false, knopf: false }, // overview login (staff), not customer mail
 };
 
 /** Placeholders usable in every text. */
 const PLATZHALTER = [
   "vorname", "nachname", "anrede_name", "betrieb", "angebot", "zusatzoptionen", "termintyp",
-  "termin", "termin_datum", "termin_uhrzeit", "alter_termin", "wann", "status", "verwalten_link",
+  "termin", "termin_datum", "termin_uhrzeit", "alter_termin", "wann", "status", "verwalten_link", "code",
 ];
 
 const WOCHENTAGE = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
@@ -125,6 +126,7 @@ function rendern(o) {
     wann: typeof o.tage === "number" ? wannText(o.tage) : "",
     status: o.status ? o.status.name : "",
     verwalten_link: o.verwalten_link || "",
+    code: o.code || "",
   };
 
   // status mails: own text per status if the customer defined one

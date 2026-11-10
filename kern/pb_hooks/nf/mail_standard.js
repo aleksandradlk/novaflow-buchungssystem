@@ -19,6 +19,9 @@ const gemeinsam = {
   abgesagt_betreff: "Termin abgesagt: {{termin}}",
   erinnerung_betreff: "Erinnerung: Termin {{wann}}",
   status_betreff: "Neuigkeiten zu Ihrem Termin: {{status}}",
+
+  anmeldecode_betreff: "Ihr Anmeldecode: {{code}}",
+  anmeldecode_inhalt: "für die Anmeldung in der Übersicht wurde ein Code angefordert:\n\n{{code}}\n\nDer Code gilt 10 Minuten. Falls Sie das nicht waren, können Sie diese Mail ignorieren.",
 };
 
 const du = Object.assign({}, gemeinsam, {
@@ -32,6 +35,8 @@ const du = Object.assign({}, gemeinsam, {
   erinnerung_inhalt: "wir möchten dich an deinen Termin {{wann}} erinnern.",
   status_betreff: "Neuigkeiten zu deinem Termin: {{status}}",
   status_inhalt: "es gibt Neuigkeiten zu deinem Termin. Der Status ist jetzt: {{status}}.",
+  anmeldecode_betreff: "Dein Anmeldecode: {{code}}",
+  anmeldecode_inhalt: "für die Anmeldung in der Übersicht wurde ein Code angefordert:\n\n{{code}}\n\nDer Code gilt 10 Minuten. Falls du das nicht warst, kannst du diese Mail ignorieren.",
 });
 
 const sie = Object.assign({}, gemeinsam, {

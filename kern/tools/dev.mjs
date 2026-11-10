@@ -77,6 +77,8 @@ if (!process.env.NF_WEBHOOK_URL) {
 const base = `http://127.0.0.1:${port}`;
 // links in mails point to the local instance unless set otherwise
 process.env.NF_OEFFENTLICHE_URL ||= base;
+// local only: login codes for the overview are also printed to this console
+process.env.NF_DEV = '1';
 console.log(`
 Lokale Instanz „${customerId}“
   Buchungsseite: ${base}/

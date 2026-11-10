@@ -111,6 +111,16 @@ onRecordCreate((e) => {
   require(`${__hooks}/nf/datensaetze.js`).tokenSetzen("token")(e);
 }, "kontakte");
 
+// Two-factor login: the one-time code goes through the outbox, not the backend mailer.
+onMailerRecordOTPSend((e) => {
+  const basis = require(`${__hooks}/nf/basis.js`);
+  const nachrichten = require(`${__hooks}/nf/nachrichten.js`);
+  const cfg = basis.einstellungen(e.app);
+  const rec = nachrichten.anmeldecode(e.app, cfg, e.record, e.meta.otpId, e.meta.password);
+  nachrichten.melden(cfg, rec);
+  // deliberately no e.next(): the backend must not send this mail itself
+}, "users");
+
 onRecordCreate((e) => {
   require(`${__hooks}/nf/datensaetze.js`).tokenSetzen("token_verwalten")(e);
 }, "buchungen");
