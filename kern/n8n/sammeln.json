@@ -1,5 +1,5 @@
 {
-  "name": "NF %%KUNDE%% · erinnerungen",
+  "name": "NF %%KUNDE%% · %%NAME%%",
   "nodes": [
     {
       "parameters": {
@@ -7,7 +7,7 @@
           "interval": [
             {
               "field": "cronExpression",
-              "expression": "0 8 * * *"
+              "expression": "%%CRON%%"
             }
           ]
         }
@@ -23,7 +23,7 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "%%KUNDE%%/erinnerungen-jetzt",
+        "path": "%%KUNDE%%/%%NAME%%-jetzt",
         "authentication": "headerAuth",
         "responseMode": "onReceived",
         "options": {}
@@ -44,8 +44,8 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "%%PB_URL%%/api/nf-intern/erinnerungen",
+        "method": "%%METHODE%%",
+        "url": "%%PB_URL%%%%PFAD%%",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -56,7 +56,7 @@
         220,
         0
       ],
-      "name": "Fällige Erinnerungen",
+      "name": "Instanz abfragen",
       "credentials": {
         "httpHeaderAuth": {
           "id": "%%CRED_SECRET%%",
@@ -123,7 +123,7 @@
       "main": [
         [
           {
-            "node": "Fällige Erinnerungen",
+            "node": "Instanz abfragen",
             "type": "main",
             "index": 0
           }
@@ -134,14 +134,14 @@
       "main": [
         [
           {
-            "node": "Fällige Erinnerungen",
+            "node": "Instanz abfragen",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fällige Erinnerungen": {
+    "Instanz abfragen": {
       "main": [
         [
           {

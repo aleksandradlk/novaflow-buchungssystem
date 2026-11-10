@@ -1,0 +1,99 @@
+{
+  "name": "NF %%KUNDE%% · %%NAME%%",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "%%CRON%%"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -100
+      ],
+      "name": "Zeitplan"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "%%KUNDE%%/%%NAME%%-jetzt",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "name": "Jetzt ausführen",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "%%CRED_SECRET%%",
+          "name": "NF %%KUNDE%% Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "%%METHODE%%",
+        "url": "%%PB_URL%%%%PFAD%%",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "name": "Instanz abfragen",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "%%CRED_SECRET%%",
+          "name": "NF %%KUNDE%% Secret"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Zeitplan": {
+      "main": [
+        [
+          {
+            "node": "Instanz abfragen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jetzt ausführen": {
+      "main": [
+        [
+          {
+            "node": "Instanz abfragen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "%%ZEITZONE%%",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  },
+  "active": true
+}

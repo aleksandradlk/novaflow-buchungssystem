@@ -49,6 +49,33 @@ function fuellen(datei, werte) {
   return JSON.parse(text);
 }
 
+/** Cron for "every N minutes" (stages of bulk mails); the sending window is checked by the instance. */
+export function etappenCron(minuten) {
+  const m = Math.max(5, Number(minuten) || 30);
+  if (m < 60) return `*/${m} * * * *`;
+  const h = Math.round(m / 60);
+  return h >= 24 ? '0 9 * * *' : `0 */${h} * * *`;
+}
+
+/**
+ * Scheduled / manual workflows – only for the modules the customer booked.
+ * vorlage "sammeln": ask the instance for keys and send each via "Mail senden";
+ * vorlage "aufruf": just call the instance (it plans mails or deletes data).
+ */
+export function zeitgesteuert(config) {
+  const M = config.kunde.module;
+  const kampagne = config.nachrichten.kampagne || {};
+  return [
+    { name: 'erinnerungen', vorlage: 'sammeln', cron: '0 8 * * *', methode: 'POST', pfad: '/api/nf-intern/erinnerungen', wenn: M.nachrichten },
+    { name: 'nachholen', vorlage: 'sammeln', cron: '*/15 * * * *', methode: 'GET', pfad: '/api/nf-intern/offen', wenn: true },
+    { name: 'kampagne-etappen', vorlage: 'sammeln', cron: etappenCron(kampagne.etappe_abstand_minuten), methode: 'POST', pfad: '/api/nf-intern/etappe', wenn: M.kampagne || M.folgetermin },
+    { name: 'kampagne-start', vorlage: 'aufruf', cron: null, methode: 'POST', pfad: '/api/nf-intern/kampagne/start', wenn: M.kampagne },
+    { name: 'nachfass', vorlage: 'aufruf', cron: '30 9 * * *', methode: 'POST', pfad: '/api/nf-intern/nachfass', wenn: M.kampagne },
+    { name: 'folgetermin-einladung', vorlage: 'aufruf', cron: '0 9 * * *', methode: 'POST', pfad: '/api/nf-intern/folgetermin-einladungen', wenn: M.folgetermin },
+    { name: 'loeschung', vorlage: 'aufruf', cron: '0 3 * * *', methode: 'POST', pfad: '/api/nf-intern/loeschung', wenn: M.loeschung },
+  ].filter((d) => d.wenn);
+}
+
 /**
  * @param {object} o
  * @param {object} o.config        validated customer config
@@ -74,8 +101,15 @@ export function buildWorkflows({ config, pbUrl, graphApiUrl = 'https://graph.mic
 
   const liste = [['mail-senden', fuellen('mail-senden.json', werte)]];
   for (const ereignis of EREIGNISSE) liste.push([ereignis, fuellen('ereignis.json', { ...werte, EREIGNIS: ereignis })]);
-  liste.push(['erinnerungen', fuellen('erinnerungen.json', werte)]);
-  liste.push(['nachholen', fuellen('nachholen.json', werte)]);
+  for (const d of zeitgesteuert(config)) {
+    const wf = fuellen(`${d.vorlage}.json`, { ...werte, NAME: d.name, CRON: d.cron || '0 0 1 1 *', METHODE: d.methode, PFAD: d.pfad });
+    if (!d.cron) {
+      // manual only: drop the schedule trigger
+      wf.nodes = wf.nodes.filter((n) => n.name !== 'Zeitplan');
+      delete wf.connections.Zeitplan;
+    }
+    liste.push([d.name, wf]);
+  }
 
   return liste.map(([name, wf]) => {
     wf.id = ids.workflow(name);
